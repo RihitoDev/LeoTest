@@ -1,93 +1,154 @@
-// lib/main.dart
-
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart'; // Añade esto a tu pubspec.yaml: google_fonts: ^x.x.x
-
-// Importa las vistas que crearemos
-import 'views/home_view.dart';
-import 'views/profile_view.dart';
+import 'package:leotest/views/home_view.dart';
+import 'package:leotest/widgets/add_book_dialog.dart';
 
 void main() {
-  runApp(const LeoTestApp());
+  runApp(const MyApp());
 }
 
-class LeoTestApp extends StatelessWidget {
-  const LeoTestApp({super.key});
+class MyApp extends StatelessWidget {
+  const MyApp({super.key});
 
   @override
   Widget build(BuildContext context) {
+    const Color primaryBlue = Color.fromARGB(255, 255, 166, 0); // Tono azul/cian
+
     return MaterialApp(
-      title: 'LeoTest Reader App',
+      title: 'LeoTest App',
       theme: ThemeData(
-        // FONDO: Usa el #1A1A1A para el fondo principal
-        scaffoldBackgroundColor: const Color(0xFF1A1A1A),
-        // ESQUEMA DE COLOR
-        colorScheme: const ColorScheme.dark(
-          primary: Color(0xFFF39C12), // ACENTO PRIMARIO NARANJA 
-          surface: Color(0xFF1A1A1A), // Fondo de elementos UI 
+        primaryColor: primaryBlue,
+        colorScheme: ColorScheme.fromSwatch(
+          primarySwatch: Colors.blue,
+          accentColor: primaryBlue,
+        ).copyWith(
+          primary: primaryBlue,
         ),
-        // ESTILO DE TEXTO
-        textTheme: GoogleFonts.poppinsTextTheme( // Usa una fuente moderna y legible
-          Theme.of(context).textTheme.apply(
-            bodyColor: const Color(0xFFE0E0E0), // Texto Claro Principal 
-            displayColor: const Color(0xFFE0E0E0),
-          ),
-        ),
-        // CONFIGURACIÓN GLOBAL
+        scaffoldBackgroundColor: Colors.white,
         useMaterial3: true,
       ),
-      home: const MainNavigator(), 
+      home: const MainScreen(),
     );
   }
 }
 
-// Esta clase va al final de lib/main.dart
-
-// Widget para manejar la navegación principal (BottomNavigationBar) (HU-7.1, 7.2)
-class MainNavigator extends StatefulWidget {
-  const MainNavigator({super.key});
+class MainScreen extends StatefulWidget {
+  const MainScreen({super.key});
 
   @override
-  State<MainNavigator> createState() => _MainNavigatorState();
+  State<MainScreen> createState() => _MainScreenState();
 }
 
-class _MainNavigatorState extends State<MainNavigator> {
-  int _selectedIndex = 0;
+class _MainScreenState extends State<MainScreen> {
+  // Índice de la vista seleccionada: 0=Inicio, 1=Mis Libros, 2=Amigos, 3=Perfil
+  int _selectedViewIndex = 0;
 
-  // Las vistas principales, mapeadas a los botones del menú [cite: 81, 145, 151, 140, 105]
-  final List<Widget> _views = const [
-    HomeView(),              // Home (Página Principal/Menú) [cite: 81]
-    Placeholder(),           // Biblioteca (Boton de Lista de Libros) [cite: 145]
-    Placeholder(),           // Agregar Libro (Boton de Agregar Libro) [cite: 151]
-    Placeholder(),           // Misiones (Misiones Diarias de Lectura) [cite: 140]
-    ProfileView(),           // Perfil del Usuario [cite: 105]
+  // Vistas (4 Vistas + 1 Acción Central = 5 ítems en el nav bar)
+  static const List<Widget> _widgetOptions = <Widget>[
+    HomeView(), // 0: Inicio
+    Text('Página de Mis Libros', style: TextStyle(fontSize: 30)), // 1: Mis Libros
+    Text('Página de Amigos', style: TextStyle(fontSize: 30)), // 2: Amigos
+    Text('Página de Perfil', style: TextStyle(fontSize: 30)), // 3: Perfil
   ];
 
-  void _onItemTapped(int index) {
-    setState(() {
-      _selectedIndex = index;
-    });
+  void _showAddBookDialog() {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return const AddBookDialog();
+      },
+    );
+  }
+
+  // Mapea el índice del navbar (0 a 4) a la acción o a la vista
+  void _onItemTapped(int navbarIndex) {
+    if (navbarIndex == 2) { // El índice 2 es el botón "Agregar" (Acción)
+      _showAddBookDialog(); 
+    } else {
+      setState(() {
+        // Mapea los índices del navbar a las vistas reales:
+        // Nav Index 0 -> View Index 0 (Inicio)
+        // Nav Index 1 -> View Index 1 (Mis Libros)
+        // Nav Index 3 -> View Index 2 (Amigos)
+        // Nav Index 4 -> View Index 3 (Perfil)
+        
+        if (navbarIndex < 2) {
+          _selectedViewIndex = navbarIndex;
+        } else {
+          _selectedViewIndex = navbarIndex - 1; 
+        }
+      });
+    }
   }
 
   @override
   Widget build(BuildContext context) {
+    // Mapea el índice de la vista al índice del navbar para que el ícono esté seleccionado
+    int currentNavbarIndex;
+    if (_selectedViewIndex < 2) {
+      currentNavbarIndex = _selectedViewIndex;
+    } else {
+      currentNavbarIndex = _selectedViewIndex + 1;
+    }
+
     return Scaffold(
-      body: _views[_selectedIndex],
+      body: Center(
+        child: _widgetOptions.elementAt(_selectedViewIndex),
+      ),
+      
+      // --- IMPLEMENTACIÓN DEL BottomNavigationBar (5 Ítems) ---
       bottomNavigationBar: BottomNavigationBar(
-        type: BottomNavigationBarType.fixed, // Mantiene los iconos fijos
-        backgroundColor: const Color(0xFF121212), // Fondo más oscuro para la barra 
-        selectedItemColor: Theme.of(context).colorScheme.primary, // Naranja para el activo 
-        unselectedItemColor: const Color(0xFFAAAAAA), // Gris suave para el inactivo 
-        currentIndex: _selectedIndex,
-        onTap: _onItemTapped,
-        items: const <BottomNavigationBarItem>[
-          // Iconos según la imagen de referencia
-          BottomNavigationBarItem(icon: Icon(Icons.home_outlined), label: 'Home'),
-          BottomNavigationBarItem(icon: Icon(Icons.book_outlined), label: 'Lista'),
-          BottomNavigationBarItem(icon: Icon(Icons.add_circle_outline), label: 'Agregar'),
-          BottomNavigationBarItem(icon: Icon(Icons.star_outline), label: 'Misiones'), // Usamos star para misiones
-          BottomNavigationBarItem(icon: Icon(Icons.person_outline), label: 'Perfil'),
+        type: BottomNavigationBarType.fixed, // Es esencial para 5 ítems
+        backgroundColor: const Color.fromARGB(255, 0, 16, 47),
+        selectedItemColor: Theme.of(context).colorScheme.primary, 
+        unselectedItemColor: Colors.grey[600],
+        
+        items: <BottomNavigationBarItem>[
+          // 0. Inicio
+          BottomNavigationBarItem(
+            icon: Icon(_selectedViewIndex == 0 ? Icons.home : Icons.home_outlined),
+            label: 'Inicio',
+          ),
+          
+          // 1. Mis Libros
+          BottomNavigationBarItem(
+            icon: Icon(_selectedViewIndex == 1 ? Icons.menu_book : Icons.menu_book_outlined),
+            label: 'Mis Libros',
+          ),
+
+          // 2. Agregar (Botón de acción - CENTRAL Y DESTACADO)
+          BottomNavigationBarItem(
+            icon: Container(
+              padding: const EdgeInsets.all(4.0),
+              decoration: BoxDecoration(
+                color: Theme.of(context).colorScheme.primary, 
+                shape: BoxShape.circle,
+                boxShadow: [
+                  BoxShadow(
+                    color: Theme.of(context).colorScheme.primary.withOpacity(0.0),
+                    blurRadius: 10,
+                  )
+                ]
+              ),
+              child: const Icon(Icons.add, size: 30, color: Colors.white), 
+            ),
+            label: 'Agregar', 
+          ),
+          
+          // 3. Amigos
+          BottomNavigationBarItem(
+            icon: Icon(_selectedViewIndex == 2 ? Icons.group : Icons.group_outlined),
+            label: 'Amigos',
+          ),
+          
+          // 4. Perfil
+          BottomNavigationBarItem(
+            icon: Icon(_selectedViewIndex == 3 ? Icons.person : Icons.person_outline),
+            label: 'Perfil',
+          ),
         ],
+        
+        currentIndex: currentNavbarIndex, 
+        onTap: _onItemTapped,
       ),
     );
   }
