@@ -16,7 +16,7 @@ class HomeView extends StatelessWidget {
 
     return Scaffold(
       appBar: AppBar(
-        backgroundColor: Colors.white, 
+        backgroundColor: const Color.fromARGB(255, 0, 4, 8), 
         elevation: 1, 
         title: Text(
           'LeoTest', 
@@ -26,7 +26,6 @@ class HomeView extends StatelessWidget {
           ),
         ),
         actions: <Widget>[
-          // ... (Elementos de la barra superior: Notificaciones, Libros, Racha, Búsqueda)
           IconButton(
             icon: Icon(Icons.notifications_outlined, color: Colors.grey[700]),
             onPressed: () {},
@@ -61,21 +60,9 @@ class HomeView extends StatelessWidget {
         ],
       ),
       
-      // --- FONDO DEGRADADO (EXACTO) Y ORDENAMIENTO DE CLASES ---
+      // Fondo sólido color plomo oscuro (#1A1A1A)
       body: Container(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            // Tonalidad suave: Blanco a un azul muy pálido
-            colors: [
-              Colors.white, 
-              Colors.lightBlue.shade50!, 
-              Colors.lightBlue.shade100!.withOpacity(0.5), 
-            ],
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-          ),
-        ),
-        
+        color: const Color.fromARGB(255, 3, 0, 12),
         child: SingleChildScrollView(
           child: Column(
             children: [

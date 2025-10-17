@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:leotest/views/home_view.dart';
 import 'package:leotest/widgets/add_book_dialog.dart';
+import 'package:leotest/views/profile_view.dart';
 
 void main() {
   runApp(const MyApp());
@@ -23,7 +24,7 @@ class MyApp extends StatelessWidget {
         ).copyWith(
           primary: primaryBlue,
         ),
-        scaffoldBackgroundColor: Colors.white,
+        scaffoldBackgroundColor: const Color.fromARGB(255, 0, 4, 8),
         useMaterial3: true,
       ),
       home: const MainScreen(),
@@ -47,7 +48,7 @@ class _MainScreenState extends State<MainScreen> {
     HomeView(), // 0: Inicio
     Text('Página de Mis Libros', style: TextStyle(fontSize: 30)), // 1: Mis Libros
     Text('Página de Amigos', style: TextStyle(fontSize: 30)), // 2: Amigos
-    Text('Página de Perfil', style: TextStyle(fontSize: 30)), // 3: Perfil
+    ProfileView(), // 3: Perfil
   ];
 
   void _showAddBookDialog() {
@@ -98,7 +99,7 @@ class _MainScreenState extends State<MainScreen> {
       // --- IMPLEMENTACIÓN DEL BottomNavigationBar (5 Ítems) ---
       bottomNavigationBar: BottomNavigationBar(
         type: BottomNavigationBarType.fixed, // Es esencial para 5 ítems
-        backgroundColor: const Color.fromARGB(255, 0, 16, 47),
+        backgroundColor: const Color.fromARGB(255, 3, 0, 12),
         selectedItemColor: Theme.of(context).colorScheme.primary, 
         unselectedItemColor: Colors.grey[600],
         
@@ -129,7 +130,7 @@ class _MainScreenState extends State<MainScreen> {
                   )
                 ]
               ),
-              child: const Icon(Icons.add, size: 30, color: Colors.white), 
+              child: const Icon(Icons.add, size: 30, color: Colors.black), 
             ),
             label: 'Agregar', 
           ),
