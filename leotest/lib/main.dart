@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:leotest/views/home_view.dart';
 import 'package:leotest/views/profile_view.dart';
-import 'package:leotest/widgets/add_book_dialog.dart';
-import 'package:leotest/views/login_view.dart'; // <-- ¡NUEVA IMPORTACIÓN!
+import 'package:leotest/widgets/add_book_modal.dart'; // Importación del modal
+import 'package:leotest/views/login_view.dart'; // Importación del punto de entrada
+import 'package:leotest/views/my_books_view.dart';
 
 void main() {
   runApp(const MyApp());
@@ -13,9 +14,9 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // ... (Definiciones de colores existentes)
-    const Color accentColor = Color.fromARGB(255, 255, 166, 0); 
-    const Color darkBackground = Color.fromARGB(255, 3, 0, 12); 
+    // Definiciones de Colores para el Tema Oscuro
+    const Color accentColor = Color.fromARGB(255, 255, 166, 0); // Naranja de acento
+    const Color darkBackground = Color.fromARGB(255, 3, 0, 12); // Fondo muy oscuro
 
     final ColorScheme customColorScheme = ColorScheme.dark(
       primary: accentColor,
@@ -46,6 +47,7 @@ class MyApp extends StatelessWidget {
   }
 }
 
+// ----------------------------------------------------------------------
 
 class MainScreen extends StatefulWidget {
   const MainScreen({super.key});
@@ -55,23 +57,26 @@ class MainScreen extends StatefulWidget {
 }
 
 class _MainScreenState extends State<MainScreen> {
-  // Índice de la vista seleccionada (0, 1, 2, 3)
-  // 0=Inicio, 1=Mis Libros, 2=Amigos, 3=Perfil
-  int _selectedViewIndex = 0;
+  // El índice de la vista actual (0 a 3). 
+  // Nota: El índice 2 del navbar es la acción, no una vista aquí.
+  int _selectedViewIndex = 0; 
 
   // Vistas (4 Vistas)
   static const List<Widget> _widgetOptions = <Widget>[
     HomeView(), // 0: Inicio
-    Text('Página de Mis Libros', style: TextStyle(fontSize: 30, color: Colors.white)), // 1: Mis Libros
-    Text('Página de Amigos', style: TextStyle(fontSize: 30, color: Colors.white)), // 2: Amigos
-    ProfileView(), // 3: Perfil
+    MyBooksView(), // 1: Mis Libros
+    Text('Página de Amigos', style: TextStyle(fontSize: 30, color: Colors.white)), // 2: Amigos (Mapeado del Navbar 3)
+    ProfileView(), // 3: Perfil (Mapeado del Navbar 4)
   ];
 
-  void _showAddBookDialog() {
-    showDialog(
+  // Muestra el AddBookModal usando showModalBottomSheet para ese look de tarjeta emergente
+  void _showAddBookModal() {
+    showModalBottomSheet(
       context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent, // Necesario para mostrar la esquina curva
       builder: (BuildContext context) {
-        return const AddBookDialog();
+        return const AddBookModal(); // Usamos el widget de Modal que diseñamos
       },
     );
   }
@@ -79,14 +84,14 @@ class _MainScreenState extends State<MainScreen> {
   // Mapea el índice del navbar (0 a 4) a la acción o a la vista
   void _onItemTapped(int navbarIndex) {
     if (navbarIndex == 2) { // El índice 2 es el botón "Agregar" (Acción)
-      _showAddBookDialog(); 
+      _showAddBookModal(); 
     } else {
       setState(() {
-        // Mapeo: 0, 1, [2], 3, 4 -> 0, 1, [Acción], 2, 3
+        // Mapeo de Navbar [0, 1, 2 (Acción), 3, 4] a Vistas [0, 1, 2, 3]
         if (navbarIndex < 2) {
-          _selectedViewIndex = navbarIndex; // 0 o 1
+          _selectedViewIndex = navbarIndex; // 0 -> 0, 1 -> 1
         } else {
-          _selectedViewIndex = navbarIndex - 1; // 3 -> 2, 4 -> 3
+          _selectedViewIndex = navbarIndex - 1; // 3 -> 2 (Amigos), 4 -> 3 (Perfil)
         }
       });
     }
@@ -94,7 +99,7 @@ class _MainScreenState extends State<MainScreen> {
 
   @override
   Widget build(BuildContext context) {
-    // Mapea el índice de la vista al índice del navbar para que el ícono esté seleccionado
+    // Calcula el índice del Navbar que debe estar 'seleccionado'
     int currentNavbarIndex;
     if (_selectedViewIndex < 2) {
       currentNavbarIndex = _selectedViewIndex;
@@ -122,13 +127,13 @@ class _MainScreenState extends State<MainScreen> {
         items: <BottomNavigationBarItem>[
           // 0. Inicio
           BottomNavigationBarItem(
-            icon: Icon(_selectedViewIndex == 0 ? Icons.home : Icons.home_outlined),
+            icon: Icon(currentNavbarIndex == 0 ? Icons.home : Icons.home_outlined),
             label: 'Inicio',
           ),
           
           // 1. Mis Libros
           BottomNavigationBarItem(
-            icon: Icon(_selectedViewIndex == 1 ? Icons.menu_book : Icons.menu_book_outlined),
+            icon: Icon(currentNavbarIndex == 1 ? Icons.menu_book : Icons.menu_book_outlined),
             label: 'Mis Libros',
           ),
 
@@ -151,15 +156,15 @@ class _MainScreenState extends State<MainScreen> {
             label: 'Agregar', 
           ),
           
-          // 3. Amigos
+          // 3. Amigos (Vista 2)
           BottomNavigationBarItem(
-            icon: Icon(_selectedViewIndex == 2 ? Icons.group : Icons.group_outlined),
+            icon: Icon(currentNavbarIndex == 3 ? Icons.group : Icons.group_outlined),
             label: 'Amigos',
           ),
           
-          // 4. Perfil
+          // 4. Perfil (Vista 3)
           BottomNavigationBarItem(
-            icon: Icon(_selectedViewIndex == 3 ? Icons.person : Icons.person_outline),
+            icon: Icon(currentNavbarIndex == 4 ? Icons.person : Icons.person_outline),
             label: 'Perfil',
           ),
         ],

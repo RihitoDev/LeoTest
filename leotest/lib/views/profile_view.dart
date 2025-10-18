@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:leotest/views/settings_view.dart'; // Importación para Editar Datos y Preferencias
 import 'package:leotest/views/progress_view.dart';  // Importación para la vista de Progreso
+import 'package:leotest/views/login_view.dart';    // <-- ¡IMPORTACIÓN NECESARIA!
 
 class ProfileView extends StatelessWidget {
   const ProfileView({super.key});
@@ -137,7 +138,12 @@ class ProfileView extends StatelessWidget {
           trailing: isLogout ? null : const Icon(Icons.arrow_forward_ios, size: 16, color: Color(0xFFAAAAAA)),
           onTap: () {
             if (isLogout) {
-              // Lógica de cerrar sesión
+              // LÓGICA DE CERRAR SESIÓN: Navega al Login y elimina el historial
+              Navigator.pushAndRemoveUntil(
+                context,
+                MaterialPageRoute(builder: (context) => const LoginView()),
+                (Route<dynamic> route) => false,
+              );
             } else if (title == 'Editar Datos y Preferencias') {
               // NAVEGACIÓN HU-11.3: Va a la pantalla de edición
               Navigator.push(
@@ -151,7 +157,6 @@ class ProfileView extends StatelessWidget {
                 MaterialPageRoute(builder: (context) => const ProgressView()),
               );
             }
-            // Puedes agregar aquí la navegación para 'Evaluaciones', 'Estadísticas' y 'Social'
           },
         ),
       ),
