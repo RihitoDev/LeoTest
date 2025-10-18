@@ -13,29 +13,31 @@ class HomeView extends StatelessWidget {
     const int booksRead = 12;
     const int currentStreak = 5;
     final primaryColor = Theme.of(context).colorScheme.primary; 
+    // El color de fondo del body es oscuro (Color.fromARGB(255, 3, 0, 12))
 
     return Scaffold(
       appBar: AppBar(
+        // Fondo de la AppBar también oscuro para la apariencia unificada
         backgroundColor: const Color.fromARGB(255, 0, 4, 8), 
         elevation: 1, 
         title: Text(
           'LeoTest', 
           style: TextStyle(
             fontWeight: FontWeight.w900, 
-            color: primaryColor
+            color: primaryColor // Naranja
           ),
         ),
         actions: <Widget>[
           IconButton(
-            icon: Icon(Icons.notifications_outlined, color: Colors.grey[700]),
+            icon: const Icon(Icons.notifications_outlined, color: Colors.white70), // Icono claro
             onPressed: () {},
           ),
           Padding(
             padding: const EdgeInsets.only(left: 4.0),
             child: Row(
               children: [
-                Icon(Icons.menu_book_rounded, color: primaryColor),
-                Text('$booksRead', style: TextStyle(fontWeight: FontWeight.bold, color: primaryColor)),
+                Icon(Icons.menu_book_rounded, color: primaryColor), // Naranja
+                Text('$booksRead', style: TextStyle(fontWeight: FontWeight.bold, color: primaryColor)), // Naranja
               ],
             ),
           ),
@@ -49,7 +51,7 @@ class HomeView extends StatelessWidget {
             ),
           ),
           IconButton(
-            icon: Icon(Icons.search, color: Colors.grey[700]),
+            icon: const Icon(Icons.search, color: Colors.white70), // Icono claro
             onPressed: () {
               showSearch(
                 context: context,
@@ -60,21 +62,16 @@ class HomeView extends StatelessWidget {
         ],
       ),
       
-      // Fondo sólido color plomo oscuro (#1A1A1A)
       body: Container(
-        color: const Color.fromARGB(255, 3, 0, 12),
+        color: const Color.fromARGB(255, 3, 0, 12), // Fondo oscuro
         child: SingleChildScrollView(
           child: Column(
             children: [
               const SizedBox(height: 20),
-              
-              // 1. CLASE 1 (Dos libros) - Orden Exacto
+              // Aquí el texto 'CLASE 1', 'CLASE 2', etc., debe ser visible.
+              // El widget BookListWidget también debe usar colores claros.
               BookListWidget(title: 'CLASE 1', books: class1Books),
-              
-              // 2. CLASE 2 (Tres libros) - Orden Exacto
               BookListWidget(title: 'CLASE 2', books: class2Books),
-
-              // 3. CLASE 3 (Dos libros) - Orden Exacto
               BookListWidget(title: 'CLASE 3', books: class3Books),
               
               const SizedBox(height: 50), 

@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:leotest/views/home_view.dart';
-import 'package:leotest/widgets/add_book_dialog.dart';
 import 'package:leotest/views/profile_view.dart';
+import 'package:leotest/widgets/add_book_dialog.dart';
+import 'package:leotest/views/login_view.dart'; // <-- ¡NUEVA IMPORTACIÓN!
 
 void main() {
   runApp(const MyApp());
@@ -12,25 +13,39 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    const Color primaryBlue = Color.fromARGB(255, 255, 166, 0); // Tono azul/cian
+    // ... (Definiciones de colores existentes)
+    const Color accentColor = Color.fromARGB(255, 255, 166, 0); 
+    const Color darkBackground = Color.fromARGB(255, 3, 0, 12); 
+
+    final ColorScheme customColorScheme = ColorScheme.dark(
+      primary: accentColor,
+      secondary: accentColor,
+      background: darkBackground,
+      surface: const Color.fromARGB(255, 15, 10, 30), // Ligeramente más claro para cardColor/surface
+      brightness: Brightness.dark,
+    );
 
     return MaterialApp(
       title: 'LeoTest App',
       theme: ThemeData(
-        primaryColor: primaryBlue,
-        colorScheme: ColorScheme.fromSwatch(
-          primarySwatch: Colors.blue,
-          accentColor: primaryBlue,
-        ).copyWith(
-          primary: primaryBlue,
-        ),
-        scaffoldBackgroundColor: const Color.fromARGB(255, 0, 4, 8),
+        brightness: Brightness.dark, 
+        primaryColor: accentColor,
+        colorScheme: customColorScheme, // Usamos el esquema corregido
+        scaffoldBackgroundColor: darkBackground,
         useMaterial3: true,
+        textTheme: const TextTheme(
+          bodyLarge: TextStyle(color: Colors.white),
+          bodyMedium: TextStyle(color: Colors.white70),
+          titleMedium: TextStyle(color: Colors.white),
+          labelLarge: TextStyle(color: Colors.white70), 
+        ),
       ),
-      home: const MainScreen(),
+      // --- PUNTO DE ENTRADA CAMBIADO ---
+      home: const LoginView(), 
     );
   }
 }
+
 
 class MainScreen extends StatefulWidget {
   const MainScreen({super.key});
@@ -40,14 +55,15 @@ class MainScreen extends StatefulWidget {
 }
 
 class _MainScreenState extends State<MainScreen> {
-  // Índice de la vista seleccionada: 0=Inicio, 1=Mis Libros, 2=Amigos, 3=Perfil
+  // Índice de la vista seleccionada (0, 1, 2, 3)
+  // 0=Inicio, 1=Mis Libros, 2=Amigos, 3=Perfil
   int _selectedViewIndex = 0;
 
-  // Vistas (4 Vistas + 1 Acción Central = 5 ítems en el nav bar)
+  // Vistas (4 Vistas)
   static const List<Widget> _widgetOptions = <Widget>[
     HomeView(), // 0: Inicio
-    Text('Página de Mis Libros', style: TextStyle(fontSize: 30)), // 1: Mis Libros
-    Text('Página de Amigos', style: TextStyle(fontSize: 30)), // 2: Amigos
+    Text('Página de Mis Libros', style: TextStyle(fontSize: 30, color: Colors.white)), // 1: Mis Libros
+    Text('Página de Amigos', style: TextStyle(fontSize: 30, color: Colors.white)), // 2: Amigos
     ProfileView(), // 3: Perfil
   ];
 
@@ -66,16 +82,11 @@ class _MainScreenState extends State<MainScreen> {
       _showAddBookDialog(); 
     } else {
       setState(() {
-        // Mapea los índices del navbar a las vistas reales:
-        // Nav Index 0 -> View Index 0 (Inicio)
-        // Nav Index 1 -> View Index 1 (Mis Libros)
-        // Nav Index 3 -> View Index 2 (Amigos)
-        // Nav Index 4 -> View Index 3 (Perfil)
-        
+        // Mapeo: 0, 1, [2], 3, 4 -> 0, 1, [Acción], 2, 3
         if (navbarIndex < 2) {
-          _selectedViewIndex = navbarIndex;
+          _selectedViewIndex = navbarIndex; // 0 o 1
         } else {
-          _selectedViewIndex = navbarIndex - 1; 
+          _selectedViewIndex = navbarIndex - 1; // 3 -> 2, 4 -> 3
         }
       });
     }
@@ -91,17 +102,22 @@ class _MainScreenState extends State<MainScreen> {
       currentNavbarIndex = _selectedViewIndex + 1;
     }
 
+    // El color primario del tema es el naranja
+    final primaryColor = Theme.of(context).colorScheme.primary;
+
     return Scaffold(
       body: Center(
         child: _widgetOptions.elementAt(_selectedViewIndex),
       ),
       
-      // --- IMPLEMENTACIÓN DEL BottomNavigationBar (5 Ítems) ---
       bottomNavigationBar: BottomNavigationBar(
         type: BottomNavigationBarType.fixed, // Es esencial para 5 ítems
-        backgroundColor: const Color.fromARGB(255, 3, 0, 12),
-        selectedItemColor: Theme.of(context).colorScheme.primary, 
-        unselectedItemColor: Colors.grey[600],
+        // Fondo de la barra de navegación también oscuro
+        backgroundColor: const Color.fromARGB(255, 0, 4, 8), 
+        // Color del ítem seleccionado (Naranja)
+        selectedItemColor: primaryColor, 
+        // Color de los ítems no seleccionados
+        unselectedItemColor: Colors.grey[700], 
         
         items: <BottomNavigationBarItem>[
           // 0. Inicio
@@ -121,16 +137,16 @@ class _MainScreenState extends State<MainScreen> {
             icon: Container(
               padding: const EdgeInsets.all(4.0),
               decoration: BoxDecoration(
-                color: Theme.of(context).colorScheme.primary, 
+                color: primaryColor, // Naranja
                 shape: BoxShape.circle,
                 boxShadow: [
                   BoxShadow(
-                    color: Theme.of(context).colorScheme.primary.withOpacity(0.0),
+                    color: primaryColor.withOpacity(0.5),
                     blurRadius: 10,
                   )
                 ]
               ),
-              child: const Icon(Icons.add, size: 30, color: Colors.black), 
+              child: const Icon(Icons.add, size: 30, color: Colors.black), // Icono 'más' negro sobre círculo naranja
             ),
             label: 'Agregar', 
           ),
