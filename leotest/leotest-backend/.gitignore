@@ -1,0 +1,81 @@
+# ===========================
+# ARCHIVOS GENERALES
+# ===========================
+*.class
+*.log
+*.pyc
+*.swp
+.DS_Store
+.atom/
+.history
+.svn/
+.env
+migrate_working_dir/
+
+# ===========================
+# ENTORNOS DE DESARROLLO
+# ===========================
+*.iml
+*.ipr
+*.iws
+.idea/
+.vscode/
+
+# ===========================
+# FLUTTER / DART FRONTEND
+# ===========================
+**/doc/api/
+**/ios/Flutter/.last_build_id
+.dart_tool/
+.flutter-plugins-dependencies
+.pub-cache/
+.pub/
+/build/
+/coverage/
+/android/app/debug
+/android/app/profile
+/android/app/release
+app.*.symbols
+app.*.map.json
+
+# ===========================
+# ⚙️ NODE / EXPRESS BACKEND
+# ===========================
+# Dependencias
+node_modules/
+
+# Compilados o builds
+dist/
+build/
+.cache/
+.tmp/
+
+# Archivos de configuración local o secretos
+.env
+.env.local
+.env.*.local
+
+# Logs y bases de datos locales
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+*.sqlite
+*.db
+
+# Archivos de pruebas o cobertura
+coverage/
+.jest/
+nyc_output/
+
+# Configuración de Supabase o claves
+supabase/.temp/
+supabase/.env
+.supabase/
+
+# ===========================
+# SISTEMAS DE CONTROL
+# ===========================
+# Ignora archivos temporales de Git
+*.orig
+*.rej

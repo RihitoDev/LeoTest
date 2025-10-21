@@ -1,0 +1,64 @@
+# ===========================
+# FLUTTER FRONTEND
+# ===========================
+
+# Dart/Pub related
+.dart_tool/
+.packages
+.flutter-plugins
+.flutter-plugins-dependencies
+.pub-cache/
+.pub/
+
+# Build outputs
+/build/
+**/build/
+**/ios/Flutter/.last_build_id
+**/ios/DerivedData/
+**/ios/Flutter/App.framework
+**/ios/Flutter/Flutter.framework
+**/ios/Flutter/Generated.xcconfig
+**/ios/ServiceDefinitions.json
+
+# Android artifacts
+/android/.gradle/
+.android/
+.gradle/
+**/android/app/release/
+**/android/app/profile/
+**/android/app/debug/
+
+# iOS artifacts
+ios/.generated/
+ios/Flutter/App.framework
+ios/Flutter/Flutter.framework
+ios/Flutter/Generated.xcconfig
+ios/ServiceDefinitions.json
+ios/Pods/
+ios/.symlinks/
+ios/profile
+ios/Runner.xcworkspace/
+ios/build/
+
+# Web (if Flutter Web is used)
+web/.dart_tool/
+web/build/
+web/.flutter-plugins
+
+# Editor related
+.idea/
+.vscode/
+*.iml
+*.ipr
+*.iws
+
+# Mac, Linux, Windows build outputs
+.macos/
+.linux/
+.windows/
+
+# Logs, coverage, temp
+*.log
+coverage/
+.tmp/
+
