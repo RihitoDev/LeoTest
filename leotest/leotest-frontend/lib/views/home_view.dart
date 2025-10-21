@@ -1,19 +1,33 @@
-// lib/views/home_view.dart
-
+// home_view.dart
 import 'package:flutter/material.dart';
 import 'package:leotest/widgets/custom_search_delegate.dart';
 import 'package:leotest/widgets/book_list_widget.dart';
 import 'package:leotest/models/book.dart';
+import 'package:leotest/services/book_service.dart'; 
 
-class HomeView extends StatelessWidget {
+class HomeView extends StatefulWidget {
   const HomeView({super.key});
+
+  @override
+  State<HomeView> createState() => _HomeViewState();
+}
+
+class _HomeViewState extends State<HomeView> {
+  // Estado para manejar la llamada a la API
+  late Future<List<Book>> _futureAllBooks;
+
+  @override
+  void initState() {
+    super.initState();
+    // Iniciar la carga de todos los libros de la API
+    _futureAllBooks = BookService.buscarLibros();
+  }
 
   @override
   Widget build(BuildContext context) {
     const int booksRead = 12;
     const int currentStreak = 5;
     final primaryColor = Theme.of(context).colorScheme.primary;
-    // Fondo del body oscuro
     const backgroundColor = Color.fromARGB(255, 3, 0, 12);
 
     return Scaffold(
@@ -24,15 +38,13 @@ class HomeView extends StatelessWidget {
           'LeoTest',
           style: TextStyle(
             fontWeight: FontWeight.w900,
-            color: primaryColor, // Naranja
+            color: primaryColor,
           ),
         ),
         actions: <Widget>[
+          // ... (Tus IconButtons existentes) ...
           IconButton(
-            icon: const Icon(
-              Icons.notifications_outlined,
-              color: Colors.white70,
-            ),
+            icon: const Icon(Icons.notifications_outlined, color: Colors.white70),
             onPressed: () {},
           ),
           Padding(
@@ -40,13 +52,7 @@ class HomeView extends StatelessWidget {
             child: Row(
               children: [
                 Icon(Icons.menu_book_rounded, color: primaryColor),
-                Text(
-                  '$booksRead',
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    color: primaryColor,
-                  ),
-                ),
+                Text('$booksRead', style: TextStyle(fontWeight: FontWeight.bold, color: primaryColor)),
               ],
             ),
           ),
@@ -55,18 +61,10 @@ class HomeView extends StatelessWidget {
             child: Row(
               children: [
                 const Icon(Icons.local_fire_department, color: Colors.orange),
-                Text(
-                  '$currentStreak',
-                  style: const TextStyle(
-                    fontWeight: FontWeight.bold,
-                    color: Colors.orange,
-                  ),
-                ),
+                Text('$currentStreak', style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.orange)),
               ],
             ),
           ),
-
-          // 🔍 Botón de búsqueda con estilo y acción
           IconButton(
             tooltip: 'Buscar libros',
             icon: const Icon(Icons.search, color: Colors.white70),
@@ -76,17 +74,57 @@ class HomeView extends StatelessWidget {
           ),
         ],
       ),
-
       body: Container(
         color: backgroundColor,
         child: SingleChildScrollView(
           child: Column(
             children: [
               const SizedBox(height: 20),
-              // Listas de libros por clase
-              BookListWidget(title: 'CLASE 1', books: class1Books),
-              BookListWidget(title: 'CLASE 2', books: class2Books),
-              BookListWidget(title: 'CLASE 3', books: class3Books),
+
+
+              FutureBuilder<List<Book>>(
+                future: _futureAllBooks,
+                builder: (context, snapshot) {
+                  if (snapshot.connectionState == ConnectionState.waiting) {
+                    return const Center(
+                      child: Padding(
+                        padding: EdgeInsets.all(32.0),
+                        child: CircularProgressIndicator(color: Colors.orange),
+                      ),
+                    );
+                  } 
+                  
+                  if (snapshot.hasError) {
+                    return Center(
+                      child: Text(
+                        'Error de conexión: ${snapshot.error}',
+                        style: const TextStyle(color: Colors.red, fontSize: 16),
+                        textAlign: TextAlign.center,
+                      ),
+                    );
+                  } 
+                  
+                  if (snapshot.hasData && snapshot.data!.isNotEmpty) {
+                    final allBooks = snapshot.data!;
+                    
+                    return Column(
+                      children: [
+                        // Muestra todos los libros obtenidos de la API
+                        BookListWidget(title: 'Libros Disponibles', books: allBooks),
+
+                      ],
+                    );
+
+                  } else {
+                    return const Center(
+                      child: Text(
+                        'No se encontraron libros en la base de datos.',
+                        style: TextStyle(color: Colors.white70, fontSize: 16),
+                      ),
+                    );
+                  }
+                },
+              ),
               const SizedBox(height: 50),
             ],
           ),

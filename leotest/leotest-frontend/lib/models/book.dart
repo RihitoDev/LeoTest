@@ -1,3 +1,4 @@
+// lib/models/book.dart
 class Book {
   final int id;
   final String titulo;
@@ -73,8 +74,3 @@ class Book {
     };
   }
 }
-
-// Datos de ejemplo
-const List<Book> class1Books = [/* ... */];
-const List<Book> class2Books = [/* ... */];
-const List<Book> class3Books = [/* ... */];
