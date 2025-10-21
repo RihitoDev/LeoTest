@@ -7,16 +7,15 @@ import fs from "fs";
 const upload = multer({ dest: "uploads/" });
 export const uploadLibroMiddleware = upload.single("archivo");
 
-//buscar libros
+// Buscar libros (búsqueda general)
 export const buscarLibros = async (req, res) => {
   try {
-    let { titulo, autor, id_categoria } = req.query;
+    let { query } = req.query;
 
-    // impieza de texto
-    titulo = titulo ? titulo.trim() : null;
-    autor = autor ? autor.trim() : null;
+    // limpieza de texto
+    query = query ? query.trim() : null;
 
-    let query = `
+    let sql = `
       SELECT 
         l.id_libro, 
         l.titulo, 
@@ -33,22 +32,17 @@ export const buscarLibros = async (req, res) => {
 
     const params = [];
 
-    if (titulo) {
-      params.push(`%${titulo}%`);
-      query += ` AND l.titulo ILIKE $${params.length}`;
+    if (query) {
+      const q = `%${query}%`;
+      params.push(q, q, q); // para titulo, autor y categoria
+      sql += ` AND (
+        l.titulo ILIKE $${params.length - 2} 
+        OR l.autor ILIKE $${params.length - 1} 
+        OR c.nombre_categoria ILIKE $${params.length}
+      )`;
     }
 
-    if (autor) {
-      params.push(`%${autor}%`);
-      query += ` AND l.autor ILIKE $${params.length}`;
-    }
-
-    if (id_categoria) {
-      params.push(parseInt(id_categoria));
-      query += ` AND l.id_categoria = $${params.length}`;
-    }
-
-    const result = await pool.query(query, params);
+    const result = await pool.query(sql, params);
 
     res.status(200).json({
       exito: true,

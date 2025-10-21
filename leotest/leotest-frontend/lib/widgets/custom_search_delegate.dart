@@ -53,7 +53,7 @@ class CustomSearchDelegate extends SearchDelegate<Book?> {
   @override
   Widget buildResults(BuildContext context) {
     return FutureBuilder<List<Book>>(
-      future: BookService.buscarLibros(titulo: query),
+      future: BookService.buscarLibros(query: query),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Center(

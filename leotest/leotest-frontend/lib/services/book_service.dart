@@ -5,14 +5,14 @@ import 'package:leotest/models/book.dart';
 
 class BookService {
   static String get baseUrl =>
-      "${dotenv.env['API_BASE']}/api/libros"; //aquí va la IP de la máquina donde corre el backend
+      "${dotenv.env['API_BASE']}/api/libros"; // IP o URL pública de tu backend
 
   // Método para buscar libros
-  static Future<List<Book>> buscarLibros({String? titulo}) async {
+  static Future<List<Book>> buscarLibros({String? query}) async {
     try {
       final uri = Uri.parse("$baseUrl/buscar").replace(
         queryParameters: {
-          if (titulo != null && titulo.isNotEmpty) "titulo": titulo,
+          if (query != null && query.isNotEmpty) "query": query,
         },
       );
 
