@@ -1,185 +1,163 @@
 import 'package:flutter/material.dart';
 import '../widgets/book_progress_card.dart';
+import '../models/user_book_progress.dart'; // Importar
+import '../services/my_books_service.dart'; // Importar
 
 // =========================================================================
-// CLASE DUMMY PARA EL DELEGADO DE BÚSQUEDA
-// Nota: Esta clase debe estar fuera de MyBooksView para evitar errores de compilación
-// Reemplaza esta clase con tu CustomSearchDelegate real.
+// CLASE DUMMY PARA EL DELEGADO DE BÚSQUEDA (sin cambios)
 // =========================================================================
 
 class _DummySearchDelegate extends SearchDelegate<String> {
-  // Configuración de la apariencia (opcional, para que se vea bien en tema oscuro)
+  // ... (código del delegado de búsqueda sin cambios)
   @override
-  ThemeData appBarTheme(BuildContext context) {
-    return Theme.of(context).copyWith(
-      appBarTheme: AppBarTheme(
-        backgroundColor: Theme.of(context).scaffoldBackgroundColor, // Fondo oscuro
-        foregroundColor: Colors.white, // Íconos y texto claro
-        iconTheme: const IconThemeData(color: Colors.white70),
-      ),
-      inputDecorationTheme: const InputDecorationTheme(
-        hintStyle: TextStyle(color: Colors.grey),
-        labelStyle: TextStyle(color: Colors.white),
-        border: InputBorder.none,
-      ),
-    );
-  }
-  
-  @override
-  List<Widget> buildActions(BuildContext context) {
-    // Botón para borrar la búsqueda
-    return [
-      IconButton(
-        icon: const Icon(Icons.clear), 
-        onPressed: () => query = '',
-      )
-    ];
-  }
-  
-  @override
-  Widget buildLeading(BuildContext context) {
-    // Botón para cerrar el delegado de búsqueda
-    return IconButton(
-      icon: const Icon(Icons.arrow_back), 
-      onPressed: () => close(context, ''), // Cierra la búsqueda
-    );
-  }
-  
-  @override
-  Widget buildResults(BuildContext context) {
-    // Muestra resultados al presionar Enter/Buscar
-    return Center(
-      child: Text('Resultados para: "$query"', style: const TextStyle(fontSize: 20, color: Colors.white)),
-    );
-  }
-  
-  @override
-  Widget buildSuggestions(BuildContext context) {
-    // Muestra sugerencias mientras el usuario escribe
-    return const Center(
-      child: Text('Escribe para empezar a buscar...', style: TextStyle(fontSize: 16, color: Colors.grey)),
-    );
-  }
+   ThemeData appBarTheme(BuildContext context) {
+      return Theme.of(context).copyWith(
+         appBarTheme: AppBarTheme(
+            backgroundColor: Theme.of(context).scaffoldBackgroundColor, // Fondo oscuro
+            foregroundColor: Colors.white, // Íconos y texto claro
+            iconTheme: const IconThemeData(color: Colors.white70),
+         ),
+         inputDecorationTheme: const InputDecorationTheme(
+            hintStyle: TextStyle(color: Colors.grey),
+            labelStyle: TextStyle(color: Colors.white),
+            border: InputBorder.none,
+         ),
+      );
+   }
+   
+   @override
+   List<Widget> buildActions(BuildContext context) {
+      return [
+         IconButton(icon: const Icon(Icons.clear), onPressed: () => query = '')
+      ];
+   }
+   
+   @override
+   Widget buildLeading(BuildContext context) {
+      return IconButton(icon: const Icon(Icons.arrow_back), onPressed: () => close(context, ''));
+   }
+   
+   @override
+   Widget buildResults(BuildContext context) {
+      return Center(
+         child: Text('Resultados para: "$query"', style: const TextStyle(fontSize: 20, color: Colors.white)),
+      );
+   }
+   
+   @override
+   Widget buildSuggestions(BuildContext context) {
+      return const Center(
+         child: Text('Escribe para empezar a buscar...', style: TextStyle(fontSize: 16, color: Colors.grey)),
+      );
+   }
 }
 
+
 // =========================================================================
-// VISTA PRINCIPAL: MYBOOKSVIEW
+// VISTA PRINCIPAL: MYBOOKSVIEW (CONVERTIDA A STATEFUL)
 // =========================================================================
 
-class MyBooksView extends StatelessWidget {
-  const MyBooksView({super.key});
+class MyBooksView extends StatefulWidget {
+   const MyBooksView({super.key});
 
-  // Datos de ejemplo para la lista de libros
-  final List<Map<String, dynamic>> _myBooks = const [
-    {
-      'title': 'El día que dejó de nevar en Alaska',
-      'cover': 'assets/covers/alaska_cover.png',
-      'current': 107,
-      'total': 204
-    },
-    {
-      'title': 'Donde todo brilla',
-      'cover': 'assets/covers/brilla_cover.png',
-      'current': 163,
-      'total': 204
-    },
-    {
-      'title': 'El principito',
-      'cover': 'assets/covers/principito_cover.png',
-      'current': 97,
-      'total': 204
-    },
-    {
-      'title': 'Don Quijote de la mancha',
-      'cover': 'assets/covers/quijote_cover.png',
-      'current': 60,
-      'total': 204
-    },
-    {
-      'title': 'Borracho estaba pero me acuerdo',
-      'cover': 'assets/covers/borracho_cover.png',
-      'current': 18,
-      'total': 204
-    },
-  ];
+   @override
+   State<MyBooksView> createState() => _MyBooksViewState();
+}
 
-  // Variables dummy para los contadores (ajusta a tus variables reales de estado/modelo)
-  final int _booksRead = 12;
-  final int _currentStreak = 5;
+class _MyBooksViewState extends State<MyBooksView> {
   
+  // Future que contendrá la lista de libros del usuario.
+  late Future<List<UserBookProgress>> _futureUserBooks;
+
+  // Variables dummy para los contadores 
+   final int _booksRead = 12;
+   final int _currentStreak = 5;
+
   @override
-  Widget build(BuildContext context) {
-    final primaryColor = Theme.of(context).colorScheme.primary; 
-
-    return Scaffold(
-      // --- CABECERA SOLICITADA (AppBar Estándar) ---
-      appBar: AppBar(
-        // Fondo de la AppBar también oscuro
-        backgroundColor: const Color.fromARGB(255, 0, 4, 8), 
-        elevation: 1, 
-        automaticallyImplyLeading: false, 
-        title: Text(
-          'LeoTest', 
-          style: TextStyle(
-            fontWeight: FontWeight.w900, 
-            color: primaryColor // Naranja
-          ),
-        ),
-        actions: <Widget>[
-          // Notificaciones
-          IconButton(
-            icon: const Icon(Icons.notifications_outlined, color: Colors.white70),
-            onPressed: () {},
-          ),
-          // Contador de Libros Leídos
-          Padding(
-            padding: const EdgeInsets.only(left: 4.0),
-            child: Row(
-              children: [
-                Icon(Icons.menu_book_rounded, color: primaryColor), // Naranja
-                Text('$_booksRead', style: TextStyle(fontWeight: FontWeight.bold, color: primaryColor)), // Naranja
-              ],
-            ),
-          ),
-          // Contador de Racha (Fuego)
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12.0),
-            child: Row(
-              children: [
-                const Icon(Icons.local_fire_department, color: Colors.orange), 
-                Text('$_currentStreak', style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.orange)),
-              ],
-            ),
-          ),
-          // Búsqueda
-          IconButton(
-            icon: const Icon(Icons.search, color: Colors.white70),
-            onPressed: () {
-              // Ahora usa la clase _DummySearchDelegate definida fuera de esta clase
-              showSearch(
-                context: context,
-                delegate: _DummySearchDelegate(), 
-              );
-            },
-          ),
-        ],
-      ),
-      // --- FIN DE CABECERA SOLICITADA ---
-
-      // Contenido: Lista de libros con progreso
-      body: ListView.builder(
-        itemCount: _myBooks.length,
-        itemBuilder: (context, index) {
-          final book = _myBooks[index];
-          return BookProgressCard(
-            title: book['title'],
-            // Nota: Asegúrate de que los paths en 'cover' existan en tus assets
-            coverAssetName: book['cover'],
-            currentPage: book['current'],
-            totalPages: book['total'],
-          );
-        },
-      ),
-    );
+  void initState() {
+    super.initState();
+    // Iniciar la carga de los libros
+    _futureUserBooks = MyBooksService.getUserBooks();
   }
+
+  // Función para refrescar la lista (útil al regresar de BookDetailView)
+  void _reloadBooks() {
+    setState(() {
+      _futureUserBooks = MyBooksService.getUserBooks();
+    });
+  }
+  
+   @override
+   Widget build(BuildContext context) {
+      final primaryColor = Theme.of(context).colorScheme.primary; 
+
+      return Scaffold(
+         // ... (AppBar sin cambios, excepto añadiendo un botón de refrescar)
+         appBar: AppBar(
+            backgroundColor: const Color.fromARGB(255, 0, 4, 8), 
+            elevation: 1, 
+            automaticallyImplyLeading: false, 
+            title: Text('Mi Biblioteca', style: TextStyle(fontWeight: FontWeight.w900, color: primaryColor)),
+            actions: <Widget>[
+               IconButton(icon: const Icon(Icons.notifications_outlined, color: Colors.white70), onPressed: () {}),
+               Padding(padding: const EdgeInsets.only(left: 4.0), child: Row(children: [Icon(Icons.menu_book_rounded, color: primaryColor), Text('$_booksRead', style: TextStyle(fontWeight: FontWeight.bold, color: primaryColor))],),),
+               Padding(padding: const EdgeInsets.symmetric(horizontal: 12.0), child: Row(children: [const Icon(Icons.local_fire_department, color: Colors.orange), Text('$_currentStreak', style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.orange))],),),
+          
+          // Botón de refrescar para actualizar la vista después de una acción
+          IconButton(icon: const Icon(Icons.refresh, color: Colors.white70), onPressed: _reloadBooks),
+          
+               IconButton(icon: const Icon(Icons.search, color: Colors.white70), onPressed: () {showSearch(context: context, delegate: _DummySearchDelegate());}),
+            ],
+         ),
+
+         // Contenido: FutureBuilder para cargar la lista
+         body: Container(
+        color: const Color.fromARGB(255, 3, 0, 12),
+        child: FutureBuilder<List<UserBookProgress>>(
+          future: _futureUserBooks,
+          builder: (context, snapshot) {
+            
+            if (snapshot.connectionState == ConnectionState.waiting) {
+              return const Center(child: CircularProgressIndicator(color: Colors.orange));
+            }
+            
+            if (snapshot.hasError) {
+              return Center(child: Text('Error: ${snapshot.error}', style: const TextStyle(color: Colors.red)));
+            }
+            
+            final userBooks = snapshot.data ?? [];
+            
+            if (userBooks.isEmpty) {
+              // Mensaje cuando la biblioteca está vacía
+              return const Center(
+                child: Padding(
+                  padding: EdgeInsets.all(30.0),
+                  child: Text(
+                    'Tu biblioteca está vacía. ¡Inicia una lectura desde el catálogo principal!',
+                    style: TextStyle(color: Colors.white70, fontSize: 18),
+                    textAlign: TextAlign.center,
+                  ),
+                ),
+              );
+            }
+
+            // Muestra la lista de libros del usuario
+            return ListView.builder(
+              itemCount: userBooks.length,
+              itemBuilder: (context, index) {
+                final book = userBooks[index];
+                return BookProgressCard(
+                  title: book.title,
+                  coverAssetName: book.coverAssetName,
+                  currentPage: book.currentPage,
+                  totalPages: book.totalPages,
+                  // Puedes añadir aquí un onTap para navegar al detalle de progreso
+                );
+              },
+            );
+          },
+        ),
+         ),
+      );
+   }
 }
