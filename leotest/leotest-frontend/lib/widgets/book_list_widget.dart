@@ -1,7 +1,8 @@
-//book_list_widget.dart
+// lib/widgets/book_list_widget.dart (ACTUALIZADO CON NAVEGACIÓN A DETALLE)
+
 import 'package:flutter/material.dart';
 import 'package:leotest/models/book.dart';
-import 'package:leotest/views/book_detail_view.dart';
+import 'package:leotest/views/book_detail_view.dart'; // 🚨 NECESITAS ESTE IMPORT
 
 class BookListWidget extends StatelessWidget {
   final String title;
@@ -11,8 +12,15 @@ class BookListWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Si la lista de libros está vacía, no muestra el widget
+    if (books.isEmpty) {
+      return const SizedBox.shrink();
+    }
+    
+    // Obtenemos los colores para mantener la consistencia con el código original
     final primaryColor = Theme.of(context).colorScheme.primary;
-    final cardColor = Theme.of(context).colorScheme.surface;
+    // Asumo que el color de fondo de tu app es oscuro, por eso surface (fondo de la "tarjeta") puede ser el que usas en el Container.
+    const cardColor = Color.fromARGB(255, 30, 30, 30); // Usaremos un color oscuro para el placeholder
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 20.0),
@@ -28,16 +36,16 @@ class BookListWidget extends StatelessWidget {
             child: Text(
               title,
               style: TextStyle(
-                fontSize: 18,
+                fontSize: 22, // Usaremos el tamaño de tu carrusel anterior (22)
                 fontWeight: FontWeight.bold,
-                color: primaryColor,
+                color: Colors.white, // Usamos blanco para el título de la categoría
               ),
             ),
           ),
 
-          // Lista horizontal de libros
+          // Lista horizontal de libros (Carrusel)
           SizedBox(
-            height: 190,
+            height: 190, // Altura del carrusel (tomada de tu código)
             child: ListView.builder(
               scrollDirection: Axis.horizontal,
               itemCount: books.length,
@@ -46,6 +54,7 @@ class BookListWidget extends StatelessWidget {
                 final book = books[index];
 
                 return GestureDetector(
+                  // 🚀 IMPLEMENTACIÓN DE LA NAVEGACIÓN
                   onTap: () {
                     Navigator.push(
                       context,
@@ -55,13 +64,13 @@ class BookListWidget extends StatelessWidget {
                     );
                   },
                   child: Container(
-                    width: 100,
+                    width: 100, // Ancho de la tarjeta
                     margin: const EdgeInsets.only(right: 16.0),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         // Portada del libro
-                        Expanded(
+                        Expanded( // Usa Expanded para que la imagen ocupe el espacio flexible
                           flex: 4,
                           child: Container(
                             decoration: BoxDecoration(
@@ -76,25 +85,27 @@ class BookListWidget extends StatelessWidget {
                               ],
                               image: (book.portada.isNotEmpty)
                                   ? DecorationImage(
-                                      image: book.portada.startsWith('http')
-                                          ? NetworkImage(book.portada)
-                                          : AssetImage(book.portada)
-                                                as ImageProvider,
-                                      fit: BoxFit.cover,
+                                        // Mantenemos la lógica de NetworkImage/AssetImage si es necesario, 
+                                        // aunque por lo general solo usarás NetworkImage.
+                                        image: book.portada.startsWith('http')
+                                            ? NetworkImage(book.portada)
+                                            : AssetImage(book.portada) as ImageProvider,
+                                        fit: BoxFit.cover,
                                     )
                                   : null,
                             ),
                             alignment: Alignment.center,
                             child: (book.portada.isEmpty)
                                 ? const Icon(
-                                    Icons.book,
-                                    color: Colors.white70,
-                                    size: 40,
-                                  )
+                                      Icons.book,
+                                      color: Colors.white70,
+                                      size: 40,
+                                    )
                                 : null,
                           ),
                         ),
                         const SizedBox(height: 6),
+                        
                         // Título del libro
                         Text(
                           book.titulo,
@@ -106,6 +117,7 @@ class BookListWidget extends StatelessWidget {
                             color: Colors.white,
                           ),
                         ),
+                        
                         // Autor del libro
                         Text(
                           book.autor,
