@@ -1,0 +1,10 @@
+# Directorios de compilación (Flutter, Android, Node)
+.dart_tool/
+.flutter-plugins-dependencies
+build/
+node_modules/
+package-lock.json
+
+# Archivos de la build de Flutter
+/leotest/build/
+/leotest/leotest-frontend/build/

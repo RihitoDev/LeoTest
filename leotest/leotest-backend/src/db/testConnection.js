@@ -1,3 +1,4 @@
+// testConnection.js
 import pool from "./connection.js";
 
 const test = async () => {

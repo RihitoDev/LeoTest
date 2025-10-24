@@ -1,24 +1,26 @@
 import express from "express";
 import cors from "cors";
-import dotenv from "dotenv"; // Para leer .env
+import dotenv from "dotenv";
 import librosRoutes from "./routes/libros.routes.js";
+import authRoutes from "./routes/auth.routes.js"; 
+import progressRoutes from './routes/progress.routes.js'; 
 
-dotenv.config(); // Carga las variables de entorno
+
+
+dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// 🔹 Habilitar CORS para permitir peticiones desde Flutter
-app.use(cors());
 
-// 🔹 Middlewares
+app.use(cors());
 app.use(express.json());
 
-// 🔹 Rutas
+app.use('/api/progress', progressRoutes);
 app.use("/api/libros", librosRoutes);
+app.use("/api/auth", authRoutes); 
 
-// 🔹 Iniciar servidor en todas las interfaces de red
+
 app.listen(PORT, '0.0.0.0', () => {
-  console.log(`Servidor corriendo en http://0.0.0.0:${PORT}`);
-  console.log(`Puedes acceder desde tu celular con http://192.168.1.2:${PORT}`);
+    // ...
 });

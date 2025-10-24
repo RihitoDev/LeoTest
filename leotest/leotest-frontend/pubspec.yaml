@@ -19,6 +19,7 @@ dependencies:
   mime: ^1.0.3
   http_parser: ^4.0.2
   flutter_dotenv: ^6.0.0
+  syncfusion_flutter_pdfviewer: ^26.2.4
 
 
 # Dependencias de desarrollo

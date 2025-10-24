@@ -8,7 +8,7 @@ class Book {
   final String? categoria; // Puede ser String? según errores anteriores
   final String descripcion;
   final int totalPaginas;
-  // ... (otras propiedades que tengas)
+  final String? urlPdf;
 
   Book({
     required this.idLibro, // 👈 ¡Añadir al constructor!
@@ -18,6 +18,7 @@ class Book {
     this.categoria, // Si es nulo
     required this.descripcion,
     required this.totalPaginas,
+    this.urlPdf,
     // ... (otros parámetros)
   });
 
@@ -28,6 +29,7 @@ class Book {
       titulo: json['titulo'] as String,
       autor: json['autor'] as String,
       portada: json['portada'] as String,
+      urlPdf: json['url_pdf'] as String?,
       categoria: json['categoria'] as String?, // Usar String?
       descripcion: json['descripcion'] as String,
       totalPaginas: json['total_paginas'] as int,

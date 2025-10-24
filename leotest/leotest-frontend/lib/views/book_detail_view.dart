@@ -3,6 +3,7 @@ import 'package:leotest/models/book.dart';
 import 'package:leotest/models/user_book_progress.dart';
 import 'package:leotest/services/my_books_service.dart';
 import 'package:leotest/services/auth_service.dart';
+import 'package:leotest/views/book_reader_view.dart'; 
 
 class BookDetailView extends StatefulWidget {
   final Book book;
@@ -23,75 +24,91 @@ class _BookDetailViewState extends State<BookDetailView> {
     _fetchBookProgress();
   }
 
-  // Carga el progreso existente del libro para el usuario actual.
+  /// Carga el progreso existente del libro para el usuario actual desde el backend.
   Future<void> _fetchBookProgress() async {
-    // 🚨 Manejo de errores de autenticación aquí y en el servicio
+    // 🚨 Seguridad: Usamos '?? "Título desconocido"' para garantizar que la API siempre reciba una String
+    final bookTitle = widget.book.titulo ?? "Título desconocido"; 
+    
     try {
-      final progress = await MyBooksService.getBookProgress(widget.book.titulo);
+      // Intentar obtener el progreso usando el título como clave de búsqueda
+      final progress = await MyBooksService.getBookProgress(bookTitle);
       setState(() {
         _bookProgress = progress;
         _isLoading = false;
       });
     } catch (e) {
-      if (e.toString().contains('sin ID de usuario')) {
-        print("Usuario no autenticado para cargar progreso. (Debe loguearse)");
-      } else {
-        print("Error al cargar el progreso del libro: $e");
-      }
+      // Manejar el caso de un error en el servicio, autenticación o conexión
+      print("Error al cargar el progreso del libro: $e");
       setState(() {
         _isLoading = false;
       });
     }
   }
 
-  // Lógica para iniciar o continuar la lectura, interactuando con la BD.
-  void _startReading() async { // 👈 Ahora es async
+  /// Lógica para iniciar o continuar la lectura, interactuando con la BD.
+  void _startReading() async {
+    // 🚨 Doble chequeo de seguridad antes de navegar
+    if (widget.book == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('❌ Error: El libro no está disponible.'), backgroundColor: Colors.red),
+      );
+      return;
+    }
+    
     try {
-      // Intentar obtener la ID del usuario (esto fallará si no está logueado)
+      // 1. Verificar autenticación.
       final currentUserId = AuthService.getCurrentUserId(); 
-
-      // 1. Si el libro NO está en la biblioteca (se añade a la BD)
+      
+      // 2. Si el libro NO está en la biblioteca, lo agregamos (HTTP POST)
       if (_bookProgress == null) {
         
-        // Llama al servicio para guardar el libro en la tabla 'progreso' (HTTP POST)
         await MyBooksService.addBookToLibrary(widget.book);
         
-        // Recarga los datos para obtener la instancia completa (con idProgreso, idLibro, etc.)
+        // Recarga los datos para obtener la instancia completa con los IDs de la BD
         await _fetchBookProgress(); 
 
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('"${widget.book.titulo}" añadido a tu biblioteca y guardado. (ID Usuario: $currentUserId)')),
+          SnackBar(content: Text('"${widget.book.titulo ?? "Libro"}" añadido a tu biblioteca. (ID: $currentUserId)')),
         );
       } 
       
-      // 2. Si ya está en progreso (o acaba de ser añadido), simular la apertura del lector
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Simulando la apertura del lector. Pág: ${_bookProgress?.currentPage ?? 0}')),
-      );
-      
-      // 🚨 Simulación de actualización de progreso (Ejemplo)
-      if (_bookProgress != null && _bookProgress!.currentPage < widget.book.totalPaginas) {
-        final newPage = _bookProgress!.currentPage + 1; // Avanza una página
-        await MyBooksService.updateBookProgress(_bookProgress!, newPage); 
-        await _fetchBookProgress(); // Recargar el progreso después de la actualización
-      }
+      // 3. Determinar la página inicial (0 si es nuevo o no se pudo cargar)
+      final initialPage = _bookProgress?.currentPage ?? 0;
+
+      // 🚨 NAVEGACIÓN A LA VISTA DE LECTOR
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => BookReaderView(
+            // El objeto widget.book es el que se pasa. La vista lectora ya maneja los nulos.
+            book: widget.book,
+            initialPage: initialPage,
+          ),
+        ),
+      ).then((_) {
+        // Al regresar del lector, volvemos a cargar el progreso
+        _fetchBookProgress();
+      });
 
 
     } catch (e) {
-      // 🚨 Manejo de la excepción de autenticación
+      // 4. Manejo completo de errores (autenticación y otros)
+      
+      // Error de autenticación
       if (e.toString().contains('sin ID de usuario')) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('❌ Debes iniciar sesión para añadir un libro a tu biblioteca.'),
+            content: Text('❌ Debes iniciar sesión para iniciar la lectura.'),
             backgroundColor: Colors.red,
           ),
         );
-      } else {
-        // Manejar otros errores inesperados (ej: fallo de red)
+      } 
+      // Otros errores (red, servidor, fallo al guardar/obtener)
+      else {
         print("Error inesperado al intentar iniciar lectura: $e");
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Error al guardar: ${e.toString()}'),
+            content: Text('Error al procesar la solicitud: ${e.toString().split(':')[0]}'),
             backgroundColor: Colors.red,
           ),
         );
@@ -99,12 +116,16 @@ class _BookDetailViewState extends State<BookDetailView> {
     }
   }
 
-  // Construye la imagen de portada usando NetworkImage o AssetImage
-  Widget _buildCoverImage(String portada) {
-    final isNetworkImage = portada.startsWith('http');
+  // Construye la imagen de portada usando NetworkImage o AssetImage según corresponda.
+  Widget _buildCoverImage(String? portada) { // Acepta portada como String?
+    // Usamos '?? ""' para asegurar que portada siempre sea una String no nula (vacía si es null)
+    final safePortada = portada ?? ""; 
+    
+    // Asumimos que si la cadena empieza por 'http', es una URL de red.
+    final isNetworkImage = safePortada.startsWith('http');
     final ImageProvider imageProvider = isNetworkImage
-        ? NetworkImage(portada)
-        : AssetImage(portada) as ImageProvider;
+        ? NetworkImage(safePortada)
+        : AssetImage(safePortada) as ImageProvider;
 
     return Container(
       width: 150,
@@ -118,14 +139,14 @@ class _BookDetailViewState extends State<BookDetailView> {
             offset: const Offset(0, 5),
           ),
         ],
-        image: portada.isNotEmpty
+        image: safePortada.isNotEmpty
             ? DecorationImage(
                 image: imageProvider,
                 fit: BoxFit.cover,
               )
             : null,
       ),
-      child: portada.isEmpty
+      child: safePortada.isEmpty
           ? const Center(
               child: Icon(Icons.menu_book, size: 50, color: Colors.white70))
           : null,
@@ -143,19 +164,19 @@ class _BookDetailViewState extends State<BookDetailView> {
       );
     }
     
+    // Calcula el progreso
     final progress = _bookProgress;
     final progressPercentage = progress != null ? (progress.progressPercentage * 100).toInt() : 0;
     
-    // Determinar el texto del botón basado en el estado (si existe)
+    // Determinar texto del botón
     String buttonText;
     if (progress == null) {
       buttonText = 'INICIAR LECTURA';
     } else if (progress.estado == 'Completado') {
-      buttonText = 'LEÍDO (Volver a empezar)';
+      buttonText = 'RELEER (Completado)';
     } else {
       buttonText = 'CONTINUAR LECTURA (Pág. ${progress.currentPage})';
     }
-
 
     return Scaffold(
       appBar: AppBar(
@@ -169,12 +190,13 @@ class _BookDetailViewState extends State<BookDetailView> {
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
             // --- 1. Portada del Libro ---
-            _buildCoverImage(widget.book.portada),
+            _buildCoverImage(widget.book.portada), // Puede ser nulo
             const SizedBox(height: 25),
 
             // --- 2. Título y Autor ---
             Text(
-              widget.book.titulo,
+              // 🚨 CORRECCIÓN: Manejo de nulos para 'titulo'
+              widget.book.titulo ?? 'Título Desconocido',
               textAlign: TextAlign.center,
               style: const TextStyle(
                 fontSize: 28,
@@ -184,7 +206,8 @@ class _BookDetailViewState extends State<BookDetailView> {
             ),
             const SizedBox(height: 5),
             Text(
-              'Autor: ${widget.book.autor}',
+              // 🚨 CORRECCIÓN: Manejo de nulos para 'autor'
+              'Autor: ${widget.book.autor ?? 'Desconocido'}',
               style: const TextStyle(
                 fontSize: 18,
                 color: Colors.grey,
@@ -198,14 +221,15 @@ class _BookDetailViewState extends State<BookDetailView> {
               spacing: 20,
               alignment: WrapAlignment.center,
               children: [
-                // 🚨 CORRECCIÓN: Manejar nulidad de widget.book.categoria
-                _buildInfoChip(Icons.category, widget.book.categoria ?? 'Sin Categoría'),
-                _buildInfoChip(Icons.bookmark_border, 'Total: ${widget.book.totalPaginas} págs.'),
+                _buildInfoChip(Icons.category, widget.book.categoria ?? 'Sin Categoría'), 
+                
+                // 🚨 CORRECCIÓN: Manejo de nulos para 'totalPaginas'
+                _buildInfoChip(Icons.bookmark_border, 'Total: ${widget.book.totalPaginas ?? '?'} págs.'),
               ],
             ),
             const SizedBox(height: 25),
 
-            // --- 4. Barra de Progreso (Visible solo si el libro ya fue iniciado) ---
+            // --- 4. Barra de Progreso ---
             if (progress != null) ...[
               const Divider(color: Colors.grey, height: 30),
               Row(
@@ -220,7 +244,7 @@ class _BookDetailViewState extends State<BookDetailView> {
                     ),
                   ),
                   Text(
-                    'Pág. ${progress.currentPage} de ${progress.totalPages}',
+                    'Pág. ${progress.currentPage} de ${progress.totalPages}', 
                     style: const TextStyle(fontSize: 14, color: Colors.grey),
                   ),
                 ],
@@ -249,7 +273,7 @@ class _BookDetailViewState extends State<BookDetailView> {
                 style: const TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.bold,
-                  color: Colors.black,
+                  color: Colors.black, // Color contrastante
                 ),
               ),
             ),
@@ -266,7 +290,8 @@ class _BookDetailViewState extends State<BookDetailView> {
             ),
             const SizedBox(height: 10),
             Text(
-              widget.book.descripcion,
+              // 🚨 CORRECCIÓN: Manejo de nulos para 'descripcion'
+              widget.book.descripcion ?? 'Sin descripción disponible.',
               textAlign: TextAlign.justify,
               style: const TextStyle(
                 fontSize: 16,
