@@ -143,65 +143,61 @@ export const subirLibro = async (req, res) => {
 // 3. OTRAS FUNCIONES CRUD Y BÚSQUEDA
 // ----------------------------------------------------
 
+// Buscar libros (búsqueda general y por categoría)
 export const buscarLibros = async (req, res) => {
-    try {
-        let { titulo, autor, id_categoria, id_nivel } = req.query;
+  try {
+    let { query, categoriaId } = req.query;
 
-        titulo = titulo ? titulo.trim() : null;
-        autor = autor ? autor.trim() : null;
+    // limpieza de texto
+    query = query ? query.trim() : null;
+    categoriaId = categoriaId ? parseInt(categoriaId) : null;
 
-        let query = `
-            SELECT 
-                l.id_libro, 
-                l.titulo, 
-                l.descripcion, 
-                l.autor, 
-                l.portada,      
-                l.ruta_archivo, 
-                l.total_paginas, 
-                l.total_capitulos, 
-                c.nombre_categoria AS categoria,
-                n.nombre_nivel_educativo AS nivel
-            FROM libro l
-            JOIN categoria c ON l.id_categoria = c.id_categoria
-            JOIN nivel_educativo n ON l.id_nivel_educativo = n.id_nivel_educativo
-            WHERE 1=1
-        `;
+    let sql = `
+      SELECT 
+        l.id_libro, 
+        l.titulo, 
+        l.descripcion, 
+        l.autor, 
+        l.portada, 
+        l.total_paginas, 
+        l.total_capitulos, 
+        l.ruta_archivo AS url_pdf,
+        c.nombre_categoria AS categoria
+      FROM libro l
+      JOIN categoria c ON l.id_categoria = c.id_categoria
+      WHERE 1=1
+    `;
 
-        const params = [];
+    const params = [];
 
-        if (titulo) {
-            params.push(`%${titulo}%`);
-            query += ` AND l.titulo ILIKE $${params.length}`;
-        }
-
-        if (autor) {
-            params.push(`%${autor}%`);
-            query += ` AND l.autor ILIKE $${params.length}`;
-        }
-
-        if (id_categoria) {
-            params.push(parseInt(id_categoria));
-            query += ` AND l.id_categoria = $${params.length}`;
-        }
-        
-        if (id_nivel) {
-            params.push(parseInt(id_nivel));
-            query += ` AND l.id_nivel_educativo = $${params.length}`;
-        }
-
-        const result = await pool.query(query, params);
-
-        res.status(200).json({
-            exito: true,
-            total: result.rows.length,
-            resultados: result.rows,
-        });
-    } catch (error) {
-        console.error("Error en buscarLibros:", error);
-        res.status(500).json({ exito: false, mensaje: "Error en la búsqueda" });
+    if (query) {
+      const q = `%${query}%`;
+      params.push(q, q, q); // para titulo, autor y categoria
+      sql += ` AND (
+        l.titulo ILIKE $${params.length - 2} 
+        OR l.autor ILIKE $${params.length - 1} 
+        OR c.nombre_categoria ILIKE $${params.length}
+      )`;
     }
+
+    if (categoriaId) {
+      params.push(categoriaId);
+      sql += ` AND c.id_categoria = $${params.length}`;
+    }
+
+    const result = await pool.query(sql, params);
+
+    res.status(200).json({
+      exito: true,
+      total: result.rows.length,
+      resultados: result.rows,
+    });
+  } catch (error) {
+    console.error("Error en buscarLibros:", error);
+    res.status(500).json({ exito: false, mensaje: "Error en la búsqueda" });
+  }
 };
+
 
 export const obtenerCategorias = async (req, res) => {
     try {

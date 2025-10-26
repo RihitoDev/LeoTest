@@ -4,7 +4,7 @@ import 'dart:convert';
 import 'dart:typed_data';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:http/http.dart' as http;
-import 'package:leotest/models/book.dart'; 
+import 'package:leotest/models/book.dart';
 
 // ------------------------------
 // --- Modelos de Datos de Apoyo ---
@@ -14,18 +14,22 @@ class Category {
   final int id;
   final String name;
   Category({required this.id, required this.name});
-  
-  factory Category.fromJson(Map<String, dynamic> json) =>
-      Category(id: json['id_categoria'] as int, name: json['nombre_categoria'] as String);
+
+  factory Category.fromJson(Map<String, dynamic> json) => Category(
+    id: json['id_categoria'] as int,
+    name: json['nombre_categoria'] as String,
+  );
 }
 
 class Level {
   final int id;
   final String name;
-  Level({required this.id, required this.name}); 
-  
-  factory Level.fromJson(Map<String, dynamic> json) =>
-      Level(id: json['id_nivel_educativo'] as int, name: json['nombre_nivel_educativo'] as String);
+  Level({required this.id, required this.name});
+
+  factory Level.fromJson(Map<String, dynamic> json) => Level(
+    id: json['id_nivel_educativo'] as int,
+    name: json['nombre_nivel_educativo'] as String,
+  );
 }
 
 // -------------------------
@@ -40,43 +44,43 @@ class BookService {
     }
     return "$apiBase/api";
   }
-  
+
   // URL principal de libros
   static String get _librosUrl => "$baseUrl/libros";
-  
-  // 🚨 CORRECCIÓN: Rutas anidadas bajo /libros
-  static String get _categoriasUrl => "$_librosUrl/categorias"; 
-  static String get _nivelesUrl => "$_librosUrl/niveles";
 
+  // 🚨 CORRECCIÓN: Rutas anidadas bajo /libros
+  static String get _categoriasUrl => "$_librosUrl/categorias";
+  static String get _nivelesUrl => "$_librosUrl/niveles";
 
   // ----------------------------------------------------
   // MÉTODOS DE BÚSQUEDA Y OBTENCIÓN DE DATOS
   // ----------------------------------------------------
-  
+
   static Future<List<Book>> buscarLibros({
-    String? titulo,
-    String? autor,
-    String? categoriaId,
-    String? nivelId,
+    String? query, // Texto de búsqueda (titulo, autor o categoría)
+    String? categoriaId, // ID de categoría para filtrar
   }) async {
     try {
       final uri = Uri.parse("$_librosUrl/buscar").replace(
         queryParameters: {
-          if (titulo != null && titulo.isNotEmpty) "titulo": titulo,
-          if (autor != null && autor.isNotEmpty) "autor": autor,
-          if (categoriaId != null && categoriaId.isNotEmpty) "id_categoria": categoriaId,
-          if (nivelId != null && nivelId.isNotEmpty) "id_nivel": nivelId,
+          if (query != null && query.isNotEmpty) "query": query,
+          if (categoriaId != null && categoriaId.isNotEmpty)
+            "categoriaId": categoriaId,
         },
       );
-      
+
       final response = await http.get(uri);
-      
+
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
         if (data['resultados'] is List) {
-          return (data['resultados'] as List).map((e) => Book.fromJson(e)).toList();
+          return (data['resultados'] as List)
+              .map((e) => Book.fromJson(e))
+              .toList();
         } else {
-          print('Error de formato de API: La clave "resultados" no es una lista.');
+          print(
+            'Error de formato de API: La clave "resultados" no es una lista.',
+          );
           return [];
         }
       } else {
@@ -92,7 +96,7 @@ class BookService {
   static Future<List<Category>> obtenerCategorias() async {
     try {
       // Usa la URL corregida: /api/libros/categorias
-      final response = await http.get(Uri.parse(_categoriasUrl)); 
+      final response = await http.get(Uri.parse(_categoriasUrl));
       if (response.statusCode == 200) {
         return (json.decode(response.body) as List)
             .map((e) => Category.fromJson(e))
@@ -109,7 +113,7 @@ class BookService {
   static Future<List<Level>> obtenerNiveles() async {
     try {
       // Usa la URL corregida: /api/libros/niveles
-      final response = await http.get(Uri.parse(_nivelesUrl)); 
+      final response = await http.get(Uri.parse(_nivelesUrl));
       if (response.statusCode == 200) {
         return (json.decode(response.body) as List)
             .map((e) => Level.fromJson(e))
@@ -126,15 +130,15 @@ class BookService {
   // ----------------------------------------------------
   // MÉTODOS DE ADMINISTRACIÓN
   // ----------------------------------------------------
-  
+
   static Future<bool> crearCategoria(String name) async {
     try {
       // La ruta de creación podría estar directamente bajo /api/categorias
       // Si el 404 persiste aquí, también prueba a usar $_librosUrl/categorias
       final response = await http.post(
-        Uri.parse(_categoriasUrl), 
+        Uri.parse(_categoriasUrl),
         headers: {'Content-Type': 'application/json'},
-        body: json.encode({'nombre': name}), 
+        body: json.encode({'nombre': name}),
       );
 
       if (response.statusCode == 201) {
@@ -143,7 +147,9 @@ class BookService {
         print('Error 409: La categoría ya existe.');
         return false;
       } else {
-        print('Error al crear categoría (HTTP ${response.statusCode}): ${response.body}');
+        print(
+          'Error al crear categoría (HTTP ${response.statusCode}): ${response.body}',
+        );
         return false;
       }
     } catch (e) {
@@ -158,9 +164,9 @@ class BookService {
     required String descripcion,
     required int idCategoria,
     required int idNivelEducativo,
-    required Uint8List bookFileBytes, 
+    required Uint8List bookFileBytes,
     required String bookFileName,
-    required Uint8List coverFileBytes, 
+    required Uint8List coverFileBytes,
     required String coverFileName,
     int totalPaginas = 0,
     int totalCapitulos = 0,
@@ -173,20 +179,24 @@ class BookService {
     request.fields['descripcion'] = descripcion;
     request.fields['id_categoria'] = idCategoria.toString();
     request.fields['id_nivel_educativo'] = idNivelEducativo.toString();
-    request.fields['total_paginas'] = totalPaginas.toString(); 
+    request.fields['total_paginas'] = totalPaginas.toString();
     request.fields['total_capitulos'] = totalCapitulos.toString();
 
-    request.files.add(http.MultipartFile.fromBytes(
+    request.files.add(
+      http.MultipartFile.fromBytes(
         'archivo',
         bookFileBytes,
         filename: bookFileName,
-    ));
+      ),
+    );
 
-    request.files.add(http.MultipartFile.fromBytes(
+    request.files.add(
+      http.MultipartFile.fromBytes(
         'portada',
         coverFileBytes,
         filename: coverFileName,
-    ));
+      ),
+    );
 
     try {
       final streamedResponse = await request.send();
@@ -196,7 +206,9 @@ class BookService {
         print('Libro y portada subidos con éxito');
         return true;
       } else {
-        print('Error al subir libro (HTTP ${response.statusCode}): ${response.body}');
+        print(
+          'Error al subir libro (HTTP ${response.statusCode}): ${response.body}',
+        );
         return false;
       }
     } catch (e) {
