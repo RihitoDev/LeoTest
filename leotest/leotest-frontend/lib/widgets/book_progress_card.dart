@@ -2,9 +2,14 @@ import 'package:flutter/material.dart';
 
 class BookProgressCard extends StatelessWidget {
   final String title;
-  final String coverAssetName; // Puede ser una URL de red o un asset local
+  final String coverAssetName;
   final int currentPage;
   final int totalPages;
+
+  /// Favoritos
+  final bool mostrarFavorito;
+  final bool esFavorito;
+  final VoidCallback? onToggleFavorito;
 
   const BookProgressCard({
     super.key,
@@ -12,9 +17,13 @@ class BookProgressCard extends StatelessWidget {
     required this.coverAssetName,
     required this.currentPage,
     required this.totalPages,
+    this.mostrarFavorito = false,
+    this.esFavorito = false,
+    this.onToggleFavorito,
   });
 
-  double get progressPercentage => totalPages > 0 ? currentPage / totalPages : 0.0;
+  double get progressPercentage =>
+      totalPages > 0 ? currentPage / totalPages : 0.0;
   String get pagesInfo => '$currentPage / $totalPages págs.';
 
   @override
@@ -23,16 +32,15 @@ class BookProgressCard extends StatelessWidget {
     final progress = (progressPercentage * 100).toInt();
 
     return Card(
-      color: const Color.fromARGB(255, 10, 10, 30), // Fondo oscuro para la tarjeta
+      color: const Color.fromARGB(255, 10, 10, 30),
       margin: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       elevation: 4,
       child: InkWell(
         onTap: () {
-          // TODO: Implementar navegación a la vista de detalle de progreso o lector
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Abriendo el libro: $title')),
-          );
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(SnackBar(content: Text('Abriendo el libro: $title')));
         },
         borderRadius: BorderRadius.circular(12),
         child: Padding(
@@ -40,29 +48,47 @@ class BookProgressCard extends StatelessWidget {
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // --- 1. Portada del Libro (Imagen Corregida) ---
               _buildCoverImage(coverAssetName),
               const SizedBox(width: 15),
-
-              // --- 2. Información y Progreso ---
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Título
-                    Text(
-                      title,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                      ),
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
+                    // 👉 Título + corazón a la derecha
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(
+                          child: Text(
+                            title,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                            ),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        if (mostrarFavorito)
+                          GestureDetector(
+                            onTap: onToggleFavorito,
+                            child: Icon(
+                              esFavorito
+                                  ? Icons.favorite
+                                  : Icons.favorite_border,
+                              color: esFavorito
+                                  ? Colors.redAccent
+                                  : Colors.white70,
+                              size: 22,
+                            ),
+                          ),
+                      ],
                     ),
+
                     const SizedBox(height: 8),
 
-                    // Progreso en Porcentaje y Páginas
+                    // 👉 Fila de progreso y páginas
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
@@ -82,9 +108,10 @@ class BookProgressCard extends StatelessWidget {
                         ),
                       ],
                     ),
+
                     const SizedBox(height: 8),
 
-                    // Barra de Progreso
+                    // 👉 Barra de progreso
                     LinearProgressIndicator(
                       value: progressPercentage,
                       backgroundColor: Colors.grey[700],
@@ -95,13 +122,11 @@ class BookProgressCard extends StatelessWidget {
                   ],
                 ),
               ),
-              
-              // Ícono de Acción (opcional)
-              Padding(
-                padding: const EdgeInsets.only(left: 10, top: 20),
+              const Padding(
+                padding: EdgeInsets.only(left: 8, top: 8),
                 child: Icon(
                   Icons.arrow_forward_ios,
-                  color: Colors.grey.shade600,
+                  color: Colors.grey,
                   size: 16,
                 ),
               ),
@@ -114,15 +139,9 @@ class BookProgressCard extends StatelessWidget {
 
   Widget _buildCoverImage(String coverAssetName) {
     final isNetworkImage = coverAssetName.startsWith('http');
-    final ImageProvider imageProvider;
-
-    if (isNetworkImage) {
-      // Usar NetworkImage para URLs de Supabase/internet
-      imageProvider = NetworkImage(coverAssetName);
-    } else {
-      // Usar AssetImage para archivos locales
-      imageProvider = AssetImage(coverAssetName);
-    }
+    final ImageProvider imageProvider = isNetworkImage
+        ? NetworkImage(coverAssetName)
+        : AssetImage(coverAssetName);
 
     return Container(
       width: 60,
@@ -136,10 +155,7 @@ class BookProgressCard extends StatelessWidget {
             offset: const Offset(0, 4),
           ),
         ],
-        image: DecorationImage(
-          image: imageProvider, // Usa el proveedor de imagen adecuado
-          fit: BoxFit.cover,
-        ),
+        image: DecorationImage(image: imageProvider, fit: BoxFit.cover),
       ),
     );
   }

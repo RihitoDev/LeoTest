@@ -5,11 +5,13 @@ import 'package:leotest/views/book_detail_view.dart';
 
 class CustomSearchDelegate extends SearchDelegate<Book?> {
   // Almacena el ID de la categoría seleccionada para usarlo en la búsqueda
-  String? _selectedCategoryId; 
-  String? _selectedCategoryName; // Almacena el nombre para mostrarlo en la barra
+  String? _selectedCategoryId;
+  String?
+  _selectedCategoryName; // Almacena el nombre para mostrarlo en la barra
 
-  late final Future<List<Category>> _futureCategories = BookService.obtenerCategorias();
-  
+  late final Future<List<Category>> _futureCategories =
+      BookService.obtenerCategorias();
+
   // Modificamos el campo de búsqueda para reflejar la categoría seleccionada
   @override
   String get searchFieldLabel {
@@ -86,12 +88,14 @@ class CustomSearchDelegate extends SearchDelegate<Book?> {
 
     return FutureBuilder<List<Book>>(
       future: BookService.buscarLibros(
-        titulo: titleQuery,
+        query: titleQuery,
         categoriaId: categoryIdQuery,
       ),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Center(child: CircularProgressIndicator(color: Colors.orange));
+          return const Center(
+            child: CircularProgressIndicator(color: Colors.orange),
+          );
         } else if (snapshot.hasError) {
           return Center(
             child: Text(
@@ -102,7 +106,7 @@ class CustomSearchDelegate extends SearchDelegate<Book?> {
           );
         } else if (snapshot.hasData && snapshot.data!.isNotEmpty) {
           final books = snapshot.data!;
-          
+
           return Container(
             color: const Color.fromARGB(255, 3, 0, 12),
             child: ListView.builder(
@@ -112,7 +116,10 @@ class CustomSearchDelegate extends SearchDelegate<Book?> {
                 final isNetworkImage = book.portada.startsWith('http');
 
                 return ListTile(
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 6,
+                  ),
                   leading: ClipRRect(
                     borderRadius: BorderRadius.circular(8),
                     child: isNetworkImage
@@ -122,7 +129,10 @@ class CustomSearchDelegate extends SearchDelegate<Book?> {
                             height: 80,
                             fit: BoxFit.cover,
                             errorBuilder: (context, error, stackTrace) =>
-                                const Icon(Icons.broken_image, color: Colors.white54),
+                                const Icon(
+                                  Icons.broken_image,
+                                  color: Colors.white54,
+                                ),
                           )
                         : Image.asset(
                             book.portada,
@@ -133,7 +143,10 @@ class CustomSearchDelegate extends SearchDelegate<Book?> {
                   ),
                   title: Text(
                     book.titulo,
-                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                   subtitle: Text(
                     book.autor,
@@ -142,7 +155,9 @@ class CustomSearchDelegate extends SearchDelegate<Book?> {
                   onTap: () {
                     Navigator.push(
                       context,
-                      MaterialPageRoute(builder: (_) => BookDetailView(book: book)),
+                      MaterialPageRoute(
+                        builder: (_) => BookDetailView(book: book),
+                      ),
                     );
                   },
                 );
@@ -164,7 +179,7 @@ class CustomSearchDelegate extends SearchDelegate<Book?> {
   @override
   Widget buildSuggestions(BuildContext context) {
     final backgroundColor = const Color.fromARGB(255, 3, 0, 12);
-    
+
     // Si ya hay un filtro seleccionado o texto escrito, solo muestra el botón de búsqueda
     if (_selectedCategoryId != null || query.isNotEmpty) {
       return Container(
@@ -177,7 +192,7 @@ class CustomSearchDelegate extends SearchDelegate<Book?> {
         ),
       );
     }
-    
+
     // ----------------------------------------------------
     // Implementación del Filtro Desplegable (ExpansionTile)
     // ----------------------------------------------------
@@ -187,12 +202,14 @@ class CustomSearchDelegate extends SearchDelegate<Book?> {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return Container(
             color: backgroundColor,
-            child: const Center(child: CircularProgressIndicator(color: Colors.orange)),
+            child: const Center(
+              child: CircularProgressIndicator(color: Colors.orange),
+            ),
           );
         } else if (snapshot.hasData && snapshot.data!.isNotEmpty) {
           final categories = snapshot.data!;
           categories.sort((a, b) => a.name.compareTo(b.name));
-          
+
           return Container(
             color: backgroundColor,
             child: ListView(
@@ -203,31 +220,57 @@ class CustomSearchDelegate extends SearchDelegate<Book?> {
                   padding: EdgeInsets.only(bottom: 15.0),
                   child: Text(
                     'Opciones de Búsqueda',
-                    style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                 ),
-                
+
                 // 2. ExpansionTile: El filtro desplegable
                 Theme(
-                  data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+                  data: Theme.of(
+                    context,
+                  ).copyWith(dividerColor: Colors.transparent),
                   child: ExpansionTile(
                     backgroundColor: const Color.fromARGB(255, 12, 12, 29),
-                    collapsedBackgroundColor: const Color.fromARGB(255, 12, 12, 29),
+                    collapsedBackgroundColor: const Color.fromARGB(
+                      255,
+                      12,
+                      12,
+                      29,
+                    ),
                     iconColor: Colors.blueAccent,
                     collapsedIconColor: Colors.white,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
                     title: const Text(
                       'Filtrar por Área/Categoría',
-                      style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
-                    leading: const Icon(Icons.filter_list, color: Colors.blueAccent),
-                    
+                    leading: const Icon(
+                      Icons.filter_list,
+                      color: Colors.blueAccent,
+                    ),
+
                     // 3. Contenido del Desplegable: La lista de categorías
                     children: categories.map((category) {
                       return ListTile(
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 20,
+                          vertical: 4,
+                        ),
                         tileColor: const Color.fromARGB(255, 10, 10, 25),
-                        leading: const Icon(Icons.folder_open, color: Colors.white54, size: 20),
+                        leading: const Icon(
+                          Icons.folder_open,
+                          color: Colors.white54,
+                          size: 20,
+                        ),
                         title: Text(
                           category.name,
                           style: const TextStyle(color: Colors.white),
@@ -238,7 +281,7 @@ class CustomSearchDelegate extends SearchDelegate<Book?> {
                           _selectedCategoryName = category.name;
                           query = '';
                           // 2. Cierra la lista de sugerencias y ejecuta la búsqueda
-                          showResults(context); 
+                          showResults(context);
                         },
                       );
                     }).toList(),
