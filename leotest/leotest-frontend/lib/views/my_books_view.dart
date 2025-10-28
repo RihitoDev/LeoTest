@@ -1,14 +1,14 @@
 // lib/views/my_books_view.dart
 
 import 'package:flutter/material.dart';
+import '../models/book.dart';
+import '../views/book_reader_view.dart';
 import '../widgets/book_progress_card.dart';
 import '../models/user_book_progress.dart';
 import '../services/my_books_service.dart';
-import '../services/favorito_service.dart'; // ✅ Importar servicio de favoritos
+import '../services/favorito_service.dart';
 
-// =========================================================================
-// CLASE DUMMY PARA EL DELEGADO DE BÚSQUEDA
-// =========================================================================
+// ... (Clase _DummySearchDelegate sin cambios) ...
 class _DummySearchDelegate extends SearchDelegate<String> {
   @override
   ThemeData appBarTheme(BuildContext context) {
@@ -74,15 +74,13 @@ class MyBooksView extends StatefulWidget {
 
 class _MyBooksViewState extends State<MyBooksView> {
   late Future<List<UserBookProgress>> _futureUserBooks;
-
-  /// IDs de libros favoritos
   Set<int> favoritosSet = {};
+  final int idPerfil = 2; // Temporal
+  final int _booksRead = 12; // Simulado
+  final int _currentStreak = 5; // Simulado
 
-  /// ID del perfil del usuario (ejemplo, cambiar según tu sesión)
-  final int idPerfil = 2;
-
-  final int _booksRead = 12;
-  final int _currentStreak = 5;
+  // ✅ 1. AÑADIDO: Estado para indicar si se está eliminando
+  bool _isDeleting = false;
 
   @override
   void initState() {
@@ -91,52 +89,146 @@ class _MyBooksViewState extends State<MyBooksView> {
     _cargarFavoritos();
   }
 
-  /// Carga favoritos desde el backend
   Future<void> _cargarFavoritos() async {
+    if (!mounted) return;
     try {
-      final favoritos = await FavoritoService.obtenerFavoritos(
-        idPerfil: idPerfil,
-      );
-      setState(() {
-        favoritosSet = favoritos.toSet();
-      });
+      final favoritos = await FavoritoService.obtenerFavoritos(idPerfil: idPerfil);
+      if (mounted) {
+        setState(() => favoritosSet = favoritos.toSet());
+      }
     } catch (e) {
       print('Error al cargar favoritos: $e');
     }
   }
 
-  /// Alternar favorito
   Future<void> toggleFavorito(UserBookProgress book) async {
+    final bool eraFavorito = favoritosSet.contains(book.idLibro);
+    if (mounted) {
+      setState(() {
+        if (eraFavorito) {
+          favoritosSet.remove(book.idLibro);
+        } else {
+          favoritosSet.add(book.idLibro);
+        }
+      });
+    }
+
     try {
-      if (favoritosSet.contains(book.idLibro)) {
-        await FavoritoService.quitarFavorito(
-          idPerfil: idPerfil,
-          idLibro: book.idLibro,
-        );
-        setState(() => favoritosSet.remove(book.idLibro));
+      if (eraFavorito) {
+        await FavoritoService.quitarFavorito(idPerfil: idPerfil, idLibro: book.idLibro);
       } else {
-        await FavoritoService.agregarFavorito(
-          idPerfil: idPerfil,
-          idLibro: book.idLibro,
-        );
-        setState(() => favoritosSet.add(book.idLibro));
+        await FavoritoService.agregarFavorito(idPerfil: idPerfil, idLibro: book.idLibro);
       }
     } catch (e) {
       print('Error al actualizar favorito: $e');
+      if (mounted) {
+        setState(() { // Revertir UI
+          if (eraFavorito) {
+            favoritosSet.add(book.idLibro);
+          } else {
+            favoritosSet.remove(book.idLibro);
+          }
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Error al actualizar favorito.')),
+        );
+      }
     }
   }
 
-  /// Saber si un libro es favorito
-  bool esFavorito(UserBookProgress book) {
-    return favoritosSet.contains(book.idLibro);
+  bool esFavorito(UserBookProgress book) => favoritosSet.contains(book.idLibro);
+
+  void _reloadBooks() {
+    if (mounted && !_isDeleting) { // Solo recarga si no está en proceso de borrado
+      setState(() {
+        _futureUserBooks = MyBooksService.getUserBooks();
+        _cargarFavoritos();
+      });
+    }
   }
 
-  /// Refrescar la lista de libros
-  void _reloadBooks() {
-    setState(() {
-      _futureUserBooks = MyBooksService.getUserBooks();
-    });
+  // ✅ --- INICIO DE NUEVA FUNCIÓN ---
+  /// Muestra el diálogo de confirmación y maneja la eliminación.
+  Future<void> _showDeleteConfirmationDialog(UserBookProgress bookToDelete) async {
+    // Evita múltiples diálogos si ya se está eliminando
+    if (_isDeleting) return;
+
+    final bool? confirmed = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false, // El usuario debe elegir una opción
+      builder: (BuildContext dialogContext) {
+        return AlertDialog(
+          backgroundColor: Theme.of(context).colorScheme.surface, // Fondo oscuro
+          title: const Text('Confirmar Eliminación', style: TextStyle(color: Colors.white)),
+          content: Text(
+            '¿Estás seguro de que quieres eliminar "${bookToDelete.title}" de tu biblioteca? Se perderá tu progreso de lectura.',
+             style: const TextStyle(color: Colors.white70)
+          ),
+          actions: <Widget>[
+            TextButton(
+              child: const Text('Cancelar', style: TextStyle(color: Colors.grey)),
+              onPressed: () {
+                Navigator.of(dialogContext).pop(false); // Devuelve false al cancelar
+              },
+            ),
+            TextButton(
+              child: const Text('Eliminar', style: TextStyle(color: Colors.redAccent)),
+              onPressed: () {
+                Navigator.of(dialogContext).pop(true); // Devuelve true al confirmar
+              },
+            ),
+          ],
+        );
+      },
+    );
+
+    // Si el usuario confirmó (confirmed == true)
+    if (confirmed == true) {
+      if(mounted) {
+        setState(() => _isDeleting = true); // Activa el indicador de borrado
+      }
+
+      // Muestra un SnackBar indicando que se está eliminando
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Eliminando "${bookToDelete.title}"...'),
+          backgroundColor: Colors.orange[800],
+        ),
+      );
+
+      // Llama al servicio para eliminar el libro
+      final bool success = await MyBooksService.deleteBookProgress(idLibro: bookToDelete.idLibro);
+
+      // Quita el SnackBar de "eliminando"
+      ScaffoldMessenger.of(context).hideCurrentSnackBar();
+
+      if (mounted) {
+          setState(() => _isDeleting = false); // Desactiva el indicador
+
+          if (success) {
+            // Muestra mensaje de éxito
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('"${bookToDelete.title}" eliminado con éxito.'),
+                backgroundColor: Colors.green[700],
+              ),
+            );
+            // Recarga la lista de libros para reflejar el cambio
+            _reloadBooks();
+          } else {
+            // Muestra mensaje de error
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('Error al eliminar "${bookToDelete.title}". Inténtalo de nuevo.'),
+                backgroundColor: Colors.redAccent,
+              ),
+            );
+          }
+      }
+    }
   }
+  // ✅ --- FIN DE NUEVA FUNCIÓN ---
+
 
   @override
   Widget build(BuildContext context) {
@@ -144,6 +236,7 @@ class _MyBooksViewState extends State<MyBooksView> {
 
     return Scaffold(
       appBar: AppBar(
+        // ... (AppBar sin cambios) ...
         backgroundColor: const Color.fromARGB(255, 0, 4, 8),
         elevation: 1,
         automaticallyImplyLeading: false,
@@ -165,7 +258,7 @@ class _MyBooksViewState extends State<MyBooksView> {
               children: [
                 Icon(Icons.menu_book_rounded, color: primaryColor),
                 Text(
-                  '$_booksRead',
+                  '$_booksRead', // Simulado
                   style: TextStyle(
                     fontWeight: FontWeight.bold,
                     color: primaryColor,
@@ -180,7 +273,7 @@ class _MyBooksViewState extends State<MyBooksView> {
               children: [
                 const Icon(Icons.local_fire_department, color: Colors.orange),
                 Text(
-                  '$_currentStreak',
+                  '$_currentStreak', // Simulado
                   style: const TextStyle(
                     fontWeight: FontWeight.bold,
                     color: Colors.orange,
@@ -190,10 +283,12 @@ class _MyBooksViewState extends State<MyBooksView> {
             ),
           ),
           IconButton(
+            tooltip: 'Refrescar biblioteca',
             icon: const Icon(Icons.refresh, color: Colors.white70),
             onPressed: _reloadBooks,
           ),
           IconButton(
+            tooltip: 'Buscar en biblioteca',
             icon: const Icon(Icons.search, color: Colors.white70),
             onPressed: () {
               showSearch(context: context, delegate: _DummySearchDelegate());
@@ -206,6 +301,7 @@ class _MyBooksViewState extends State<MyBooksView> {
         child: FutureBuilder<List<UserBookProgress>>(
           future: _futureUserBooks,
           builder: (context, snapshot) {
+            // ... (Manejo de estados de carga y error sin cambios) ...
             if (snapshot.connectionState == ConnectionState.waiting) {
               return const Center(
                 child: CircularProgressIndicator(color: Colors.orange),
@@ -214,42 +310,98 @@ class _MyBooksViewState extends State<MyBooksView> {
 
             if (snapshot.hasError) {
               return Center(
-                child: Text(
-                  'Error: ${snapshot.error}',
-                  style: const TextStyle(color: Colors.red),
-                ),
-              );
-            }
-
-            final userBooks = snapshot.data ?? [];
-
-            if (userBooks.isEmpty) {
-              return const Center(
                 child: Padding(
-                  padding: EdgeInsets.all(30.0),
+                  padding: const EdgeInsets.all(20.0),
                   child: Text(
-                    'Tu biblioteca está vacía. ¡Inicia una lectura desde el catálogo principal!',
-                    style: TextStyle(color: Colors.white70, fontSize: 18),
+                    'Ocurrió un error al cargar tu biblioteca:\n${snapshot.error}',
+                    style: const TextStyle(color: Colors.redAccent, fontSize: 16),
                     textAlign: TextAlign.center,
                   ),
                 ),
               );
             }
 
-            return ListView.builder(
-              itemCount: userBooks.length,
-              itemBuilder: (context, index) {
-                final book = userBooks[index];
-                return BookProgressCard(
-                  title: book.title,
-                  coverAssetName: book.coverAssetName,
-                  currentPage: book.currentPage,
-                  totalPages: book.totalPages,
-                  mostrarFavorito: true, // ✅ Muestra el corazón
-                  esFavorito: esFavorito(book), // ✅ Marca según estado
-                  onToggleFavorito: () => toggleFavorito(book), // ✅ Alterna
-                );
+             final userBooks = snapshot.data ?? [];
+
+             if (userBooks.isEmpty) {
+              return Center( // Envuelto en Center para asegurar centrado
+                child: RefreshIndicator( // Añadido RefreshIndicator aquí también
+                   onRefresh: () async {
+                      _reloadBooks();
+                      await _futureUserBooks;
+                   },
+                  child: ListView( // Usar ListView para que RefreshIndicator funcione
+                     physics: const AlwaysScrollableScrollPhysics(),
+                     children: const [
+                       Padding(
+                         padding: EdgeInsets.all(30.0),
+                         child: Text(
+                           'Tu biblioteca está vacía. ¡Inicia una lectura desde el catálogo principal!',
+                           style: TextStyle(color: Colors.white70, fontSize: 18),
+                           textAlign: TextAlign.center,
+                         ),
+                       ),
+                     ],
+                   ),
+                ),
+              );
+            }
+
+            return RefreshIndicator(
+              onRefresh: () async {
+                 _reloadBooks();
+                 await _futureUserBooks;
               },
+              color: primaryColor,
+              backgroundColor: const Color.fromARGB(255, 10, 10, 30),
+              child: ListView.builder(
+                physics: const AlwaysScrollableScrollPhysics(),
+                itemCount: userBooks.length,
+                itemBuilder: (context, index) {
+                  final bookProgress = userBooks[index];
+                  return BookProgressCard(
+                    title: bookProgress.title,
+                    coverAssetName: bookProgress.coverAssetName,
+                    currentPage: bookProgress.currentPage,
+                    totalPages: bookProgress.totalPages,
+                    mostrarFavorito: true,
+                    esFavorito: esFavorito(bookProgress),
+                    onToggleFavorito: () => toggleFavorito(bookProgress),
+
+                    onTap: () async {
+                      final bookToOpen = Book(
+                        idLibro: bookProgress.idLibro,
+                        titulo: bookProgress.title,
+                        autor: bookProgress.autor,
+                        portada: bookProgress.coverAssetName,
+                        categoria: bookProgress.categoria,
+                        descripcion: bookProgress.descripcion,
+                        totalPaginas: bookProgress.totalPages,
+                        urlPdf: bookProgress.urlPdf,
+                      );
+
+                      final result = await Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => BookReaderView(
+                            book: bookToOpen,
+                            initialPage: bookProgress.currentPage,
+                          ),
+                        ),
+                      );
+
+                      if (result == true && mounted) { // Verifica mounted
+                        print("Recargando biblioteca porque se guardó progreso...");
+                        _reloadBooks();
+                      } else {
+                         print("No se recarga biblioteca (resultado: $result o widget desmontado)");
+                      }
+                    },
+                    // ✅ 2. PASAR EL CALLBACK DE ELIMINACIÓN
+                    onDeleteTapped: () => _showDeleteConfirmationDialog(bookProgress),
+                  );
+                },
+              ),
             );
           },
         ),

@@ -59,7 +59,11 @@ class MyApp extends StatelessWidget {
 // ----------------------------------------------------------------------
 
 class MainScreen extends StatefulWidget {
-  const MainScreen({super.key});
+  // 1. AÑADIDO: Parámetro para el índice inicial
+  final int initialIndex;
+
+  // 2. MODIFICADO: Constructor para aceptar el índice
+  const MainScreen({super.key, this.initialIndex = 0});
 
   @override
   State<MainScreen> createState() => _MainScreenState();
@@ -78,6 +82,14 @@ class _MainScreenState extends State<MainScreen> {
     ),
     ProfileView(),
   ];
+
+  // 3. AÑADIDO: Método initState para establecer el índice inicial
+  @override
+  void initState() {
+    super.initState();
+    // Asigna el índice inicial que viene del widget
+    _selectedViewIndex = widget.initialIndex;
+  }
 
   // Muestra el modal para agregar un libro
   void _showAddBookModal() {

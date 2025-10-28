@@ -1,6 +1,11 @@
+// lib/views/book_reader_view.dart
+
 import 'package:flutter/material.dart';
+import 'package:leotest/main.dart';
 import 'package:leotest/models/book.dart';
+import 'package:leotest/services/my_books_service.dart';
 import 'package:syncfusion_flutter_pdfviewer/pdfviewer.dart';
+import 'package:intl/intl.dart'; // ✅ 1. IMPORTAR INTL PARA FORMATEAR PORCENTAJE
 
 class BookReaderView extends StatefulWidget {
   final Book book;
@@ -15,8 +20,12 @@ class BookReaderView extends StatefulWidget {
 class _BookReaderViewState extends State<BookReaderView> {
   late int _currentPage;
   late final PdfViewerController _pdfController;
-  final int _currentStreak = 17;
-  final int _notifications = 4;
+  final int _currentStreak = 17; // Simulado
+  final int _notifications = 4; // Simulado
+  late int _maxPageRead;
+  bool _progressWasSaved = false;
+  // ✅ 2. AÑADIR FORMATEADOR DE NÚMEROS
+  final NumberFormat _percentFormat = NumberFormat('##0%');
 
   int get _safeTotalPages =>
       widget.book.totalPaginas > 0 ? widget.book.totalPaginas : 1;
@@ -26,30 +35,51 @@ class _BookReaderViewState extends State<BookReaderView> {
     super.initState();
     _pdfController = PdfViewerController();
     _currentPage = widget.initialPage.clamp(0, _safeTotalPages - 1);
+    _maxPageRead = _currentPage;
+
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _pdfController.jumpToPage(_currentPage + 1);
     });
   }
 
   @override
-  void dispose() {
+  void dispose() async {
+    await _saveProgress();
     _pdfController.dispose();
     super.dispose();
   }
 
-  void _goToPreviousPage() {
-    if (_currentPage > 0) {
-      _currentPage--;
-      _pdfController.previousPage();
-      setState(() {});
+  Future<void> _saveProgress() async {
+    if (_maxPageRead > widget.initialPage) {
+      try {
+        await MyBooksService.updatePageProgress(
+          idLibro: widget.book.idLibro,
+          newPage: _maxPageRead,
+          totalPages: _safeTotalPages,
+        );
+        _progressWasSaved = true;
+        print("✅ Progreso guardado exitosamente.");
+      } catch (e) {
+        _progressWasSaved = false;
+        print("❌ Error al guardar progreso en dispose: $e");
+      }
+    } else {
+      _progressWasSaved = false;
     }
   }
 
+  void _goToPreviousPage() {
+    _pdfController.previousPage();
+  }
+
   void _goToNextPage() {
-    if (_currentPage < _safeTotalPages - 1) {
-      _currentPage++;
-      _pdfController.nextPage();
-      setState(() {});
+    _pdfController.nextPage();
+  }
+
+  Future<void> _exitReaderAndSignal() async {
+    await _saveProgress();
+    if (mounted) {
+      Navigator.of(context).pop(_progressWasSaved);
     }
   }
 
@@ -57,7 +87,6 @@ class _BookReaderViewState extends State<BookReaderView> {
   Widget build(BuildContext context) {
     final primaryColor = Theme.of(context).colorScheme.primary;
 
-    // Escapar la URL para que no falle por espacios
     final pdfUrl = widget.book.urlPdf;
     final pdfUrlEscaped = pdfUrl != null ? Uri.encodeFull(pdfUrl) : null;
 
@@ -74,7 +103,9 @@ class _BookReaderViewState extends State<BookReaderView> {
       );
     }
 
-    final progressValue = (_currentPage + 1) / _safeTotalPages;
+    final progressValue = (_maxPageRead + 1) / _safeTotalPages;
+    // ✅ 3. CALCULAR PORCENTAJE FORMATEADO
+    final String progressPercent = _percentFormat.format(progressValue);
 
     return Scaffold(
       backgroundColor: const Color.fromARGB(255, 3, 0, 12),
@@ -86,6 +117,7 @@ class _BookReaderViewState extends State<BookReaderView> {
               padding: const EdgeInsets.all(12.0),
               child: Column(
                 children: [
+                  // ... (Row con notificaciones, título, racha sin cambios) ...
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
@@ -170,11 +202,13 @@ class _BookReaderViewState extends State<BookReaderView> {
                   const SizedBox(height: 5),
                   Align(
                     alignment: Alignment.centerRight,
+                    // ✅ 4. MODIFICADO: Mostrar el porcentaje formateado
                     child: Text(
-                      '${_currentPage + 1}/$_safeTotalPages',
+                      progressPercent, // Muestra el porcentaje
                       style: const TextStyle(
                         color: Colors.white70,
                         fontSize: 12,
+                        fontWeight: FontWeight.bold, // Opcional: resaltar
                       ),
                     ),
                   ),
@@ -189,7 +223,8 @@ class _BookReaderViewState extends State<BookReaderView> {
                   vertical: 10,
                 ),
                 child: Container(
-                  decoration: BoxDecoration(
+                  // ... (Decoración y SfPdfViewer sin cambios) ...
+                   decoration: BoxDecoration(
                     color: Colors.white,
                     borderRadius: BorderRadius.circular(5),
                     boxShadow: [
@@ -200,7 +235,7 @@ class _BookReaderViewState extends State<BookReaderView> {
                       ),
                     ],
                   ),
-                  child: SfPdfViewer.network(
+                   child: SfPdfViewer.network(
                     pdfUrlEscaped,
                     controller: _pdfController,
                     pageSpacing: 0,
@@ -211,9 +246,14 @@ class _BookReaderViewState extends State<BookReaderView> {
                       );
                     },
                     onPageChanged: (details) {
-                      setState(() {
-                        _currentPage = details.newPageNumber - 1;
-                      });
+                      if(mounted){
+                        setState(() {
+                          _currentPage = details.newPageNumber - 1;
+                          if (_currentPage > _maxPageRead) {
+                            _maxPageRead = _currentPage;
+                          }
+                        });
+                      }
                     },
                   ),
                 ),
@@ -226,7 +266,7 @@ class _BookReaderViewState extends State<BookReaderView> {
                 mainAxisAlignment: MainAxisAlignment.spaceAround,
                 children: [
                   IconButton(
-                    onPressed: () => Navigator.pop(context),
+                    onPressed: _exitReaderAndSignal,
                     icon: const Icon(Icons.home, size: 36),
                     color: primaryColor,
                   ),
@@ -239,12 +279,15 @@ class _BookReaderViewState extends State<BookReaderView> {
                     ),
                   ),
                   IconButton(
+                    tooltip: 'Guardar marcador', // Tooltip añadido
                     onPressed: () {
                       ScaffoldMessenger.of(context).showSnackBar(
                         SnackBar(
                           content: Text(
+                            // ✅ 5. CONFIRMADO: El SnackBar ya muestra la página correcta
                             'Marcador guardado en la página ${_currentPage + 1}',
                           ),
+                           duration: const Duration(seconds: 1), // Más corta
                         ),
                       );
                     },
@@ -267,10 +310,12 @@ class _BookReaderViewState extends State<BookReaderView> {
                     ),
                   ),
                   IconButton(
+                    tooltip: 'Ir a Evaluación (No implementado)',
                     onPressed: () {
                       ScaffoldMessenger.of(context).showSnackBar(
                         const SnackBar(
-                          content: Text('Navegando a la Evaluación del Libro'),
+                          content: Text('FUNCIONALIDAD PENDIENTE: Evaluación del Libro'),
+                           backgroundColor: Colors.blueGrey,
                         ),
                       );
                     },

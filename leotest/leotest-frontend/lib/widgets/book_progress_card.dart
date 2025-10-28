@@ -1,3 +1,5 @@
+// lib/widgets/book_progress_card.dart
+
 import 'package:flutter/material.dart';
 
 class BookProgressCard extends StatelessWidget {
@@ -11,6 +13,12 @@ class BookProgressCard extends StatelessWidget {
   final bool esFavorito;
   final VoidCallback? onToggleFavorito;
 
+  /// Acción al tocar la tarjeta
+  final VoidCallback? onTap;
+
+  // ✅ 1. AÑADIDO: Callback para el botón de eliminar
+  final VoidCallback? onDeleteTapped;
+
   const BookProgressCard({
     super.key,
     required this.title,
@@ -20,6 +28,8 @@ class BookProgressCard extends StatelessWidget {
     this.mostrarFavorito = false,
     this.esFavorito = false,
     this.onToggleFavorito,
+    this.onTap,
+    this.onDeleteTapped, // ✅ 2. AÑADIDO AL CONSTRUCTOR
   });
 
   double get progressPercentage =>
@@ -37,27 +47,27 @@ class BookProgressCard extends StatelessWidget {
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       elevation: 4,
       child: InkWell(
-        onTap: () {
-          ScaffoldMessenger.of(
-            context,
-          ).showSnackBar(SnackBar(content: Text('Abriendo el libro: $title')));
-        },
+        onTap: onTap,
         borderRadius: BorderRadius.circular(12),
         child: Padding(
           padding: const EdgeInsets.all(12.0),
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              // --- Portada ---
               _buildCoverImage(coverAssetName),
               const SizedBox(width: 15),
+
+              // --- Detalles del Libro y Progreso ---
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // 👉 Título + corazón a la derecha
+                    // --- Título y Botones (Favorito y Eliminar) ---
                     Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
+                        // Título (ocupa el espacio restante)
                         Expanded(
                           child: Text(
                             title,
@@ -70,25 +80,44 @@ class BookProgressCard extends StatelessWidget {
                             overflow: TextOverflow.ellipsis,
                           ),
                         ),
+
+                        // Botón de Favorito (si está habilitado)
                         if (mostrarFavorito)
-                          GestureDetector(
-                            onTap: onToggleFavorito,
-                            child: Icon(
-                              esFavorito
-                                  ? Icons.favorite
-                                  : Icons.favorite_border,
-                              color: esFavorito
-                                  ? Colors.redAccent
-                                  : Colors.white70,
-                              size: 22,
+                          Padding( // Añadido Padding para separar iconos
+                            padding: const EdgeInsets.only(left: 8.0),
+                            child: GestureDetector(
+                              onTap: onToggleFavorito,
+                              child: Icon(
+                                esFavorito
+                                    ? Icons.favorite
+                                    : Icons.favorite_border,
+                                color: esFavorito
+                                    ? Colors.redAccent
+                                    : Colors.white70,
+                                size: 22,
+                              ),
                             ),
                           ),
+
+                        // ✅ 3. AÑADIDO: Botón de Eliminar (si hay callback)
+                        if (onDeleteTapped != null)
+                          Padding( // Añadido Padding para separar iconos
+                             padding: const EdgeInsets.only(left: 8.0),
+                             child: GestureDetector(
+                               onTap: onDeleteTapped,
+                               child: const Icon(
+                                 Icons.delete_outline,
+                                 color: Colors.grey, // Color discreto
+                                 size: 22,
+                               ),
+                             ),
+                           ),
                       ],
                     ),
 
                     const SizedBox(height: 8),
 
-                    // 👉 Fila de progreso y páginas
+                    // --- Fila de Progreso y Páginas ---
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
@@ -111,7 +140,7 @@ class BookProgressCard extends StatelessWidget {
 
                     const SizedBox(height: 8),
 
-                    // 👉 Barra de progreso
+                    // --- Barra de Progreso ---
                     LinearProgressIndicator(
                       value: progressPercentage,
                       backgroundColor: Colors.grey[700],
@@ -122,14 +151,17 @@ class BookProgressCard extends StatelessWidget {
                   ],
                 ),
               ),
-              const Padding(
-                padding: EdgeInsets.only(left: 8, top: 8),
-                child: Icon(
-                  Icons.arrow_forward_ios,
-                  color: Colors.grey,
-                  size: 16,
-                ),
-              ),
+
+              // --- Icono de Flecha (si es necesario) ---
+              // Se puede quitar si no se usa para navegación directa desde aquí
+              // const Padding(
+              //   padding: EdgeInsets.only(left: 8, top: 8),
+              //   child: Icon(
+              //     Icons.arrow_forward_ios,
+              //     color: Colors.grey,
+              //     size: 16,
+              //   ),
+              // ),
             ],
           ),
         ),
@@ -139,9 +171,6 @@ class BookProgressCard extends StatelessWidget {
 
   Widget _buildCoverImage(String coverAssetName) {
     final isNetworkImage = coverAssetName.startsWith('http');
-    final ImageProvider imageProvider = isNetworkImage
-        ? NetworkImage(coverAssetName)
-        : AssetImage(coverAssetName);
 
     return Container(
       width: 60,
@@ -155,7 +184,25 @@ class BookProgressCard extends StatelessWidget {
             offset: const Offset(0, 4),
           ),
         ],
-        image: DecorationImage(image: imageProvider, fit: BoxFit.cover),
+      ),
+      clipBehavior: Clip.hardEdge,
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(6),
+        child: isNetworkImage
+            ? Image.network(
+                coverAssetName,
+                width: double.infinity,
+                height: double.infinity,
+                fit: BoxFit.cover,
+                errorBuilder: (context, error, stackTrace) =>
+                    const Center(child: Icon(Icons.broken_image, color: Colors.grey)),
+              )
+            : Image.asset(
+                coverAssetName,
+                width: double.infinity,
+                height: double.infinity,
+                fit: BoxFit.cover,
+              ),
       ),
     );
   }
