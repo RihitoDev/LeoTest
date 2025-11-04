@@ -1,11 +1,12 @@
-// lib/views/book_reader_view.dart
+// lib/views/book_reader_view.dart (Ajustar este archivo en el frontend)
 
 import 'package:flutter/material.dart';
 import 'package:leotest/main.dart';
 import 'package:leotest/models/book.dart';
 import 'package:leotest/services/my_books_service.dart';
+import 'package:leotest/services/stats_service.dart';
 import 'package:syncfusion_flutter_pdfviewer/pdfviewer.dart';
-import 'package:intl/intl.dart'; // ✅ 1. IMPORTAR INTL PARA FORMATEAR PORCENTAJE
+import 'package:intl/intl.dart';
 
 class BookReaderView extends StatefulWidget {
   final Book book;
@@ -20,12 +21,11 @@ class BookReaderView extends StatefulWidget {
 class _BookReaderViewState extends State<BookReaderView> {
   late int _currentPage;
   late final PdfViewerController _pdfController;
-  final int _currentStreak = 17; // Simulado
-  final int _notifications = 4; // Simulado
+  final int _notifications = 4;
   late int _maxPageRead;
   bool _progressWasSaved = false;
-  // ✅ 2. AÑADIR FORMATEADOR DE NÚMEROS
   final NumberFormat _percentFormat = NumberFormat('##0%');
+  late Future<int> _futureCurrentStreak;
 
   int get _safeTotalPages =>
       widget.book.totalPaginas > 0 ? widget.book.totalPaginas : 1;
@@ -36,19 +36,24 @@ class _BookReaderViewState extends State<BookReaderView> {
     _pdfController = PdfViewerController();
     _currentPage = widget.initialPage.clamp(0, _safeTotalPages - 1);
     _maxPageRead = _currentPage;
+    _futureCurrentStreak = StatsService.fetchCurrentStreak();
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _pdfController.jumpToPage(_currentPage + 1);
     });
   }
 
+  // ✅ CORRECCIÓN 1: El método dispose ya NO es async.
+  // Llama a la función asíncrona de guardado pero no espera por ella aquí.
   @override
-  void dispose() async {
-    await _saveProgress();
+  void dispose() {
+    // Llamada sin await, pero la función _saveProgress es la que maneja la asyncronía
+    _saveProgress(); 
     _pdfController.dispose();
-    super.dispose();
+    super.dispose(); // ✅ Asegura que se llama a super.dispose()
   }
 
+  // ✅ CORRECCIÓN 2: _saveProgress ahora se encarga de la asyncronía y usa el result del push.
   Future<void> _saveProgress() async {
     if (_maxPageRead > widget.initialPage) {
       try {
@@ -76,10 +81,14 @@ class _BookReaderViewState extends State<BookReaderView> {
     _pdfController.nextPage();
   }
 
+  // ✅ CORRECCIÓN 3: El exitReader ahora sí es async para asegurar el guardado
   Future<void> _exitReaderAndSignal() async {
-    await _saveProgress();
+    // 1. Espera a que el guardado termine ANTES de cerrar la pantalla
+    await _saveProgress(); 
+
     if (mounted) {
-      Navigator.of(context).pop(_progressWasSaved);
+      // 2. Devuelve si se guardó progreso o no
+      Navigator.of(context).pop(_progressWasSaved); 
     }
   }
 
@@ -91,7 +100,7 @@ class _BookReaderViewState extends State<BookReaderView> {
     final pdfUrlEscaped = pdfUrl != null ? Uri.encodeFull(pdfUrl) : null;
 
     if (pdfUrlEscaped == null || pdfUrlEscaped.isEmpty) {
-      return Scaffold(
+       return Scaffold(
         appBar: AppBar(title: Text(widget.book.titulo ?? "Error")),
         backgroundColor: const Color.fromARGB(255, 3, 0, 12),
         body: const Center(
@@ -104,7 +113,6 @@ class _BookReaderViewState extends State<BookReaderView> {
     }
 
     final progressValue = (_maxPageRead + 1) / _safeTotalPages;
-    // ✅ 3. CALCULAR PORCENTAJE FORMATEADO
     final String progressPercent = _percentFormat.format(progressValue);
 
     return Scaffold(
@@ -112,15 +120,15 @@ class _BookReaderViewState extends State<BookReaderView> {
       body: SafeArea(
         child: Column(
           children: [
-            // Header con notificaciones, título y racha
+            // ... (Header sin cambios) ...
             Padding(
               padding: const EdgeInsets.all(12.0),
               child: Column(
                 children: [
-                  // ... (Row con notificaciones, título, racha sin cambios) ...
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
+                      // Notificaciones
                       Stack(
                         alignment: Alignment.topRight,
                         children: [
@@ -151,6 +159,7 @@ class _BookReaderViewState extends State<BookReaderView> {
                             ),
                         ],
                       ),
+                      // Título del Libro
                       Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
@@ -172,27 +181,35 @@ class _BookReaderViewState extends State<BookReaderView> {
                           ),
                         ],
                       ),
-                      Row(
-                        children: [
-                          const Icon(
-                            Icons.local_fire_department,
-                            color: Colors.orange,
-                            size: 28,
-                          ),
-                          const SizedBox(width: 4),
-                          Text(
-                            '$_currentStreak',
-                            style: const TextStyle(
-                              fontWeight: FontWeight.bold,
-                              color: Colors.white,
-                              fontSize: 18,
-                            ),
-                          ),
-                        ],
+                      // Integración: Racha
+                      FutureBuilder<int>(
+                        future: _futureCurrentStreak,
+                        builder: (context, snapshot) {
+                          final currentStreak = snapshot.data ?? 0;
+                          return Row(
+                            children: [
+                              const Icon(
+                                Icons.local_fire_department,
+                                color: Colors.orange,
+                                size: 28,
+                              ),
+                              const SizedBox(width: 4),
+                              Text(
+                                '$currentStreak',
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.white,
+                                  fontSize: 18,
+                                ),
+                              ),
+                            ],
+                          );
+                        },
                       ),
                     ],
                   ),
                   const SizedBox(height: 10),
+                  // Barra de Progreso
                   LinearProgressIndicator(
                     value: progressValue,
                     backgroundColor: Colors.grey[800],
@@ -200,15 +217,15 @@ class _BookReaderViewState extends State<BookReaderView> {
                     minHeight: 10,
                   ),
                   const SizedBox(height: 5),
+                  // Indicador de Porcentaje
                   Align(
                     alignment: Alignment.centerRight,
-                    // ✅ 4. MODIFICADO: Mostrar el porcentaje formateado
                     child: Text(
-                      progressPercent, // Muestra el porcentaje
+                      progressPercent, 
                       style: const TextStyle(
                         color: Colors.white70,
                         fontSize: 12,
-                        fontWeight: FontWeight.bold, // Opcional: resaltar
+                        fontWeight: FontWeight.bold,
                       ),
                     ),
                   ),
@@ -223,7 +240,6 @@ class _BookReaderViewState extends State<BookReaderView> {
                   vertical: 10,
                 ),
                 child: Container(
-                  // ... (Decoración y SfPdfViewer sin cambios) ...
                    decoration: BoxDecoration(
                     color: Colors.white,
                     borderRadius: BorderRadius.circular(5),
@@ -270,6 +286,7 @@ class _BookReaderViewState extends State<BookReaderView> {
                     icon: const Icon(Icons.home, size: 36),
                     color: primaryColor,
                   ),
+                  // ... (Resto de botones sin cambios) ...
                   IconButton(
                     onPressed: _currentPage > 0 ? _goToPreviousPage : null,
                     icon: Icon(
@@ -279,15 +296,14 @@ class _BookReaderViewState extends State<BookReaderView> {
                     ),
                   ),
                   IconButton(
-                    tooltip: 'Guardar marcador', // Tooltip añadido
+                    tooltip: 'Guardar marcador', 
                     onPressed: () {
                       ScaffoldMessenger.of(context).showSnackBar(
                         SnackBar(
                           content: Text(
-                            // ✅ 5. CONFIRMADO: El SnackBar ya muestra la página correcta
                             'Marcador guardado en la página ${_currentPage + 1}',
                           ),
-                           duration: const Duration(seconds: 1), // Más corta
+                           duration: const Duration(seconds: 1), 
                         ),
                       );
                     },

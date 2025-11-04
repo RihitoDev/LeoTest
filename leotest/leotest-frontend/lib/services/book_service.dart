@@ -57,8 +57,8 @@ class BookService {
   // ----------------------------------------------------
 
   static Future<List<Book>> buscarLibros({
-    String? query, // Texto de búsqueda (titulo, autor o categoría)
-    String? categoriaId, // ID de categoría para filtrar
+    String? query,
+    String? categoriaId, 
   }) async {
     try {
       final uri = Uri.parse("$_librosUrl/buscar").replace(
@@ -95,7 +95,6 @@ class BookService {
 
   static Future<List<Category>> obtenerCategorias() async {
     try {
-      // Usa la URL corregida: /api/libros/categorias
       final response = await http.get(Uri.parse(_categoriasUrl));
       if (response.statusCode == 200) {
         return (json.decode(response.body) as List)
@@ -133,8 +132,6 @@ class BookService {
 
   static Future<bool> crearCategoria(String name) async {
     try {
-      // La ruta de creación podría estar directamente bajo /api/categorias
-      // Si el 404 persiste aquí, también prueba a usar $_librosUrl/categorias
       final response = await http.post(
         Uri.parse(_categoriasUrl),
         headers: {'Content-Type': 'application/json'},

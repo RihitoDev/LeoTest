@@ -1,10 +1,14 @@
+// lib/main.dart
+
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter/material.dart';
 import 'package:leotest/views/home_view.dart';
 import 'package:leotest/views/profile_view.dart';
-import 'package:leotest/widgets/add_book_modal.dart'; // Modal para agregar libros
-import 'package:leotest/views/login_view.dart'; // Vista de inicio de sesión
+import 'package:leotest/widgets/add_book_modal.dart';
+import 'package:leotest/views/login_view.dart';
 import 'package:leotest/views/my_books_view.dart';
+// ✅ 1. IMPORTAR LA NUEVA VISTA DE MISIONES
+import 'package:leotest/views/missions_view.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -24,7 +28,7 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Colores para el tema oscuro
+    // ... (Código del ThemeData sin cambios) ...
     const Color accentColor = Color.fromARGB(255, 255, 166, 0);
     const Color darkBackground = Color.fromARGB(255, 3, 0, 12);
 
@@ -51,7 +55,7 @@ class MyApp extends StatelessWidget {
           labelLarge: TextStyle(color: Colors.white70),
         ),
       ),
-      home: const LoginView(), // Vista inicial
+      home: const LoginView(),
     );
   }
 }
@@ -59,10 +63,7 @@ class MyApp extends StatelessWidget {
 // ----------------------------------------------------------------------
 
 class MainScreen extends StatefulWidget {
-  // 1. AÑADIDO: Parámetro para el índice inicial
   final int initialIndex;
-
-  // 2. MODIFICADO: Constructor para aceptar el índice
   const MainScreen({super.key, this.initialIndex = 0});
 
   @override
@@ -70,29 +71,26 @@ class MainScreen extends StatefulWidget {
 }
 
 class _MainScreenState extends State<MainScreen> {
-  int _selectedViewIndex = 0; // Índice de la vista actual
+  int _selectedViewIndex = 0;
 
   // Vistas disponibles
   static const List<Widget> _widgetOptions = <Widget>[
     HomeView(),
     MyBooksView(),
-    Text(
-      'Página de Amigos',
-      style: TextStyle(fontSize: 30, color: Colors.white),
-    ),
+    // ✅ 2. MODIFICADO: Reemplazar el placeholder de Amigos por MissionsView()
+    MissionsView(),
     ProfileView(),
   ];
 
-  // 3. AÑADIDO: Método initState para establecer el índice inicial
   @override
   void initState() {
     super.initState();
-    // Asigna el índice inicial que viene del widget
     _selectedViewIndex = widget.initialIndex;
   }
 
   // Muestra el modal para agregar un libro
   void _showAddBookModal() {
+    // ... (Código del modal sin cambios) ...
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -108,6 +106,7 @@ class _MainScreenState extends State<MainScreen> {
 
   // Maneja los clics del BottomNavigationBar
   void _onItemTapped(int navbarIndex) {
+    // ... (Código de _onItemTapped sin cambios) ...
     if (navbarIndex == 2) {
       _showAddBookModal(); // Botón central "Agregar"
     } else {
@@ -140,12 +139,14 @@ class _MainScreenState extends State<MainScreen> {
         selectedItemColor: primaryColor,
         unselectedItemColor: Colors.grey[700],
         items: <BottomNavigationBarItem>[
+          // ... (Item 'Inicio' sin cambios) ...
           BottomNavigationBarItem(
             icon: Icon(
               currentNavbarIndex == 0 ? Icons.home : Icons.home_outlined,
             ),
             label: 'Inicio',
           ),
+          // ... (Item 'Mis Libros' sin cambios) ...
           BottomNavigationBarItem(
             icon: Icon(
               currentNavbarIndex == 1
@@ -154,6 +155,7 @@ class _MainScreenState extends State<MainScreen> {
             ),
             label: 'Mis Libros',
           ),
+          // ... (Item 'Agregar' sin cambios) ...
           BottomNavigationBarItem(
             icon: Container(
               padding: const EdgeInsets.all(4.0),
@@ -171,12 +173,18 @@ class _MainScreenState extends State<MainScreen> {
             ),
             label: 'Agregar',
           ),
+
+          // ✅ 3. MODIFICADO: Cambiar 'Amigos' por 'Misiones'
           BottomNavigationBarItem(
             icon: Icon(
-              currentNavbarIndex == 3 ? Icons.group : Icons.group_outlined,
+              currentNavbarIndex == 3
+                  ? Icons.task_alt // Icono para 'Misiones'
+                  : Icons.task_alt_outlined,
             ),
-            label: 'Amigos',
+            label: 'Misiones', // Etiqueta 'Misiones'
           ),
+
+          // ... (Item 'Perfil' sin cambios) ...
           BottomNavigationBarItem(
             icon: Icon(
               currentNavbarIndex == 4 ? Icons.person : Icons.person_outline,

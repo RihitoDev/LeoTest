@@ -1,16 +1,13 @@
-// lib/models/user_book_progress.dart
-
 class UserBookProgress {
   final String userId;
   final int idProgreso;
   final int idLibro;
   final String title;
-  final String coverAssetName; // portada
-  final int currentPage; // paginas_leidas
-  final int totalPages; // total_paginas (viene del JOIN de libro)
+  final String coverAssetName;
+  final int currentPage;
+  final int totalPages;
   final String estado;
 
-  // ✅ CAMPOS AÑADIDOS (para poder construir un objeto Book)
   final String autor;
   final String descripcion;
   final String? urlPdf;
@@ -28,7 +25,6 @@ class UserBookProgress {
     required this.currentPage,
     required this.totalPages,
     required this.estado,
-    // ✅ AÑADIDOS AL CONSTRUCTOR
     required this.autor,
     required this.descripcion,
     this.urlPdf,
@@ -46,7 +42,6 @@ class UserBookProgress {
       currentPage: json['paginas_leidas'] as int,
       totalPages: json['total_paginas'] as int,
       estado: json['estado'] as String,
-      // ✅ AÑADIDOS AL FACTORY
       autor: json['autor'] as String,
       descripcion: json['descripcion'] as String,
       urlPdf: json['url_pdf'] as String?,

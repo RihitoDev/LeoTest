@@ -1,5 +1,3 @@
-// lib/services/my_books_service.dart
-
 import 'dart:convert';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:http/http.dart' as http;
@@ -12,7 +10,6 @@ class MyBooksService {
   static String get _baseUrl => "${dotenv.env['API_BASE']}/api/progress";
   static String get _currentUserId => AuthService.getCurrentUserId();
 
-  /// Obtiene todos los libros en progreso para el usuario actual desde el backend.
   static Future<List<UserBookProgress>> getUserBooks() async {
     final userId = _currentUserId;
     try {
@@ -30,7 +27,7 @@ class MyBooksService {
               .toList();
         }
       } else {
-         print('Error HTTP [${response.statusCode}] al obtener biblioteca: ${response.body}');
+        print('Error HTTP [${response.statusCode}] al obtener biblioteca: ${response.body}');
       }
       return [];
     } catch (e) {
@@ -39,21 +36,16 @@ class MyBooksService {
     }
   }
 
-  /// Busca el progreso de un libro específico en el backend.
   static Future<UserBookProgress?> getBookProgress(String title) async {
     try {
       final books = await getUserBooks();
-      // Filtra localmente después de obtener todos.
       return books.firstWhere((b) => b.title == title);
     } catch (e) {
-      // Si no lo encuentra (FirstWhereError) o hay otro error, retorna null
       print("Libro '$title' no encontrado en progreso o error: $e");
       return null;
     }
   }
 
-
-  /// Añade un libro nuevo a la biblioteca del usuario a través del API.
   static Future<void> addBookToLibrary(Book book) async {
     final userId = _currentUserId;
 
@@ -86,7 +78,6 @@ class MyBooksService {
     }
   }
 
-  /// Actualiza el progreso de un libro existente en el backend.
   static Future<void> updateBookProgress(
       UserBookProgress progress, int newPage) async {
     final userId = _currentUserId;
@@ -116,7 +107,6 @@ class MyBooksService {
     }
   }
 
-  /// Actualiza solo la página de un libro, usado por el lector.
   static Future<void> updatePageProgress({
     required int idLibro,
     required int newPage,
@@ -148,8 +138,6 @@ class MyBooksService {
     }
   }
 
-  // ✅ --- INICIO DE NUEVO MÉTODO ---
-  /// Elimina el progreso de un libro para el usuario actual.
   static Future<bool> deleteBookProgress({required int idLibro}) async {
     try {
       final userId = _currentUserId;
@@ -160,21 +148,18 @@ class MyBooksService {
 
       if (response.statusCode == 200) {
         print('✅ Libro $idLibro eliminado de la biblioteca para usuario $userId');
-        return true; // Éxito
+        return true;
       } else if (response.statusCode == 404) {
         print('⚠️ Libro $idLibro no encontrado en la biblioteca para eliminar.');
-        return false; // No encontrado, pero no es un error grave
+        return false;
       } else {
-        // Otros errores del servidor
         final data = json.decode(response.body);
         print('❌ Error [${response.statusCode}] al eliminar libro: ${data['mensaje']}');
-        return false; // Error
+        return false;
       }
     } catch (e) {
       print('Error de conexión al eliminar libro: $e');
-      return false; // Error de conexión
+      return false;
     }
   }
-  // ✅ --- FIN DE NUEVO MÉTODO ---
-
 }

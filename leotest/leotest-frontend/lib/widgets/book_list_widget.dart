@@ -1,9 +1,15 @@
+// lib/widgets/book_list_widget.dart
+
 import 'package:flutter/material.dart';
 import 'package:leotest/models/book.dart';
 import 'package:leotest/views/book_detail_view.dart';
+// ✅ 1. IMPORTAR LA NUEVA VISTA Y EL MODELO CATEGORY
+import 'package:leotest/views/category_detail_view.dart';
+import 'package:leotest/services/book_service.dart'; // Para el modelo Category
 
 class BookListWidget extends StatelessWidget {
-  final String title;
+  // ✅ 2. MODIFICADO: AHORA RECIBE EL OBJETO CATEGORY COMPLETO
+  final Category category;
   final List<Book> books;
 
   /// Mostrar el icono de favorito
@@ -17,7 +23,7 @@ class BookListWidget extends StatelessWidget {
 
   const BookListWidget({
     super.key,
-    required this.title,
+    required this.category, // Modificado
     required this.books,
     this.mostrarFavorito = false,
     this.onToggleFavorito,
@@ -32,31 +38,57 @@ class BookListWidget extends StatelessWidget {
     if (books.isEmpty) return const SizedBox.shrink();
 
     const cardColor = Color.fromARGB(255, 30, 30, 30);
+    final primaryColor = Theme.of(context).colorScheme.primary;
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 20.0),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Título de la sección
+          // ✅ 3. MODIFICADO: Título de la sección ahora en un Row
           Padding(
-            padding: const EdgeInsets.symmetric(
-              horizontal: 16.0,
-              vertical: 8.0,
-            ),
-            child: Text(
-              title,
-              style: const TextStyle(
-                fontSize: 22,
-                fontWeight: FontWeight.bold,
-                color: Colors.white,
-              ),
+            padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                // Título
+                Text(
+                  category.name, // Usa el nombre de la categoría
+                  style: const TextStyle(
+                    fontSize: 22,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                  ),
+                ),
+                // Botón "Ver más"
+                TextButton(
+                  onPressed: () {
+                    // Navega a la nueva pantalla de detalles de categoría
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) =>
+                            CategoryDetailView(category: category),
+                      ),
+                    );
+                  },
+                  child: Text(
+                    'Ver más',
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: primaryColor,
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
 
-          // Lista horizontal de libros
+          // Lista horizontal de libros (sin cambios)
           SizedBox(
-            height: 210, // Ajuste para incluir el icono debajo de la portada
+            height: 210,
             child: ListView.builder(
               scrollDirection: Axis.horizontal,
               itemCount: books.length,
@@ -79,7 +111,7 @@ class BookListWidget extends StatelessWidget {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        // 🔹 Portada del libro
+                        // Portada del libro
                         Expanded(
                           flex: 4,
                           child: Container(
@@ -98,8 +130,13 @@ class BookListWidget extends StatelessWidget {
                                       image: book.portada.startsWith('http')
                                           ? NetworkImage(book.portada)
                                           : AssetImage(book.portada)
-                                                as ImageProvider,
+                                              as ImageProvider,
                                       fit: BoxFit.cover,
+                                      // Manejo de error de imagen
+                                      onError: (exception, stackTrace) =>
+                                          const Center(
+                                              child: Icon(Icons.broken_image,
+                                                  color: Colors.grey)),
                                     )
                                   : null,
                             ),
@@ -115,7 +152,7 @@ class BookListWidget extends StatelessWidget {
                         ),
                         const SizedBox(height: 6),
 
-                        // 🔹 Título y autor
+                        // Título y autor
                         Text(
                           book.titulo,
                           maxLines: 1,

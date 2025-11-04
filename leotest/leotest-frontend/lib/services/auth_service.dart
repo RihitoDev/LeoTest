@@ -15,10 +15,9 @@ class AuthService {
   static String get _baseUrl => "${dotenv.env['API_BASE']}/api/auth";
 
   // --- GESTIÓN DE ESTADO DE SESIÓN ---
-  static String? _currentUserId; // Guarda la ID de la sesión
-  static String? _currentUserRole; // Guarda el rol de la sesión
+  static String? _currentUserId; 
+  static String? _currentUserRole; 
 
-  // Método usado por MyBooksService
   static String getCurrentUserId() {
     if (_currentUserId == null) {
         throw Exception("Error: Intento de acceso a recurso privado sin ID de usuario.");
@@ -28,15 +27,14 @@ class AuthService {
   
   static String? getCurrentUserRole() => _currentUserRole;
 
-  // 🚨 NUEVA FUNCIÓN: Limpia la sesión
   static void logout() {
     _currentUserId = null;
     _currentUserRole = null;
     print("✅ Sesión cerrada y estado limpio.");
-    // NOTA: Si usaras JWTs o tokens de sesión, la limpieza del token iría aquí.
   }
   // ------------------------------------
 
+  // (MÉTODO LOGIN SIN CAMBIOS)
   static Future<AuthResult> login(String username, String password) async {
     try {
       final response = await http.post(
@@ -52,11 +50,9 @@ class AuthService {
       
       if (response.statusCode == 200 && data['exito'] == true) {
         
-        // Asegúrate de que tu backend use 'id_usuario'
         final String fetchedUserId = data['id_usuario'].toString(); 
         final String role = data['rol'] as String;
         
-        // Guardar el estado de la sesión
         _currentUserId = fetchedUserId;
         _currentUserRole = role;
 
@@ -66,7 +62,7 @@ class AuthService {
           role: role,
         );
       } else {
-        logout(); // Limpiar el estado en caso de fallo
+        logout();
         return AuthResult(
           success: false,
           errorMessage: data['mensaje'] ?? 'Error de autenticación',
@@ -74,11 +70,54 @@ class AuthService {
       }
     } catch (e) {
       print('Error de conexión en login: $e');
-      logout(); // Limpiar el estado en caso de error de conexión
+      logout();
       return AuthResult(
         success: false,
         errorMessage: 'Error de red o servidor no disponible.',
       );
     }
   }
+
+  // ✅ --- INICIO DE NUEVO MÉTODO ---
+  static Future<AuthResult> register({
+    required String fullName,
+    required String username,
+    required String password,
+    required String email,
+  }) async {
+    try {
+      final response = await http.post(
+        Uri.parse("$_baseUrl/register"), // Nuevo endpoint
+        headers: {'Content-Type': 'application/json'},
+        body: json.encode({
+          'nombre_completo': fullName,
+          'nombre_usuario': username,
+          'contraseña': password,
+          'email': email,
+        }),
+      );
+
+      final data = json.decode(response.body);
+
+      if (response.statusCode == 201 && data['exito'] == true) {
+        return AuthResult(
+          success: true,
+          errorMessage: data['mensaje'] ?? 'Registro exitoso.',
+        );
+      } else {
+        // Error como usuario ya existente (409) o error de validación (400)
+        return AuthResult(
+          success: false,
+          errorMessage: data['mensaje'] ?? 'Error al registrar usuario.',
+        );
+      }
+    } catch (e) {
+      print('Error de conexión en registro: $e');
+      return AuthResult(
+        success: false,
+        errorMessage: 'Error de red o servidor no disponible.',
+      );
+    }
+  }
+  // ✅ --- FIN DE NUEVO MÉTODO ---
 }

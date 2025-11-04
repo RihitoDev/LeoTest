@@ -1,18 +1,41 @@
+// lib/views/profile_view.dart
+
 import 'package:flutter/material.dart';
 import 'package:leotest/views/settings_view.dart';
 import 'package:leotest/views/progress_view.dart';
 import 'package:leotest/views/login_view.dart';
-import 'package:leotest/services/auth_service.dart'; // <-- Servicio de autenticación
+import 'package:leotest/services/auth_service.dart';
+import 'package:leotest/services/profile_service.dart';
+import 'package:leotest/services/stats_service.dart'; // Mantener si se usa GeneralStats en el servicio
 
-class ProfileView extends StatelessWidget {
+class ProfileView extends StatefulWidget {
   const ProfileView({super.key});
+
+  @override
+  State<ProfileView> createState() => _ProfileViewState();
+}
+
+class _ProfileViewState extends State<ProfileView> {
+  late Future<UserProfileData> _futureProfileData;
+  
+  @override
+  void initState() {
+    super.initState();
+    _loadProfileData();
+  }
+
+  void _loadProfileData() {
+    if (mounted) {
+      setState(() {
+        _futureProfileData = ProfileService.fetchProfileData();
+      });
+    }
+  }
 
   // --- WIDGETS AUXILIARES ---
 
-  // Muestra el avatar y las estadísticas rápidas (HU-11.2)
-  Widget _buildAvatarSection(BuildContext context, Color primaryColor) {
-    // 🚨 NOTA: En un sistema real, el nombre y email deben obtenerse del AuthService.
-    // Usaremos valores estáticos por ahora.
+  // Muestra el avatar y las estadísticas rápidas (HU-11.2, HU-3.1)
+  Widget _buildAvatarSection(BuildContext context, Color primaryColor, UserProfileData profile) {
     
     return Column(
       children: [
@@ -20,32 +43,35 @@ class ProfileView extends StatelessWidget {
           width: 100,
           height: 100,
           decoration: BoxDecoration(
-            color: primaryColor, // Naranja
+            color: primaryColor,
             shape: BoxShape.circle,
           ),
-          child: const Icon(Icons.person, size: 60, color: Colors.black), // Icono negro sobre naranja
+          child: const Icon(Icons.person, size: 60, color: Colors.black),
         ),
         const SizedBox(height: 10),
-        const Text(
-          // Simulación: Nombre del usuario actual
-          'Alejandro', 
-          style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.white)
+        // Datos Reales: Nombre de Perfil
+        Text(
+          profile.nombrePerfil, 
+          style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.white)
         ),
         const SizedBox(height: 5),
-        const Text(
-          // Simulación: Email del usuario actual
-          'alejandro.u@example.com', 
-          style: TextStyle(fontSize: 14, color: Colors.grey)
+        // Datos Reales: Email
+        Text(
+          profile.email, 
+          style: const TextStyle(fontSize: 14, color: Colors.grey)
         ),
 
-        // Simulación de estadísticas rápidas
+        // Estadísticas Reales (CORREGIDO: Acceso directo a las propiedades)
         const SizedBox(height: 15),
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceEvenly,
           children: [
-            _buildStatItem('Libros Leídos', '12'),
-            _buildStatItem('Racha', '5 días'),
-            _buildStatItem('Nivel', 'Avanzado'),
+            // ✅ CORREGIDO: Usar profile.librosLeidos
+            _buildStatItem('Libros Leídos', profile.librosLeidos.toString()),
+            // ✅ CORREGIDO: Usar profile.rachaDias
+            _buildStatItem('Racha', '${profile.rachaDias} días'),
+            // Datos del Perfil: Nivel
+            _buildStatItem('Nivel', profile.nivelEducativo),
           ],
         ),
       ],
@@ -69,13 +95,13 @@ class ProfileView extends StatelessWidget {
     IconData icon, 
     Color cardColor, 
     Color primaryColor,
-    {bool isLogout = false}
+    {bool isLogout = false, VoidCallback? onTapAction}
   ) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8.0),
       child: Container(
         decoration: BoxDecoration(
-          color: cardColor, // Color de tarjeta oscuro
+          color: cardColor,
           borderRadius: BorderRadius.circular(10),
           boxShadow: [
               BoxShadow(
@@ -95,31 +121,25 @@ class ProfileView extends StatelessWidget {
             )
           ),
           trailing: isLogout ? null : const Icon(Icons.arrow_forward_ios, size: 16, color: Color(0xFFAAAAAA)),
-          onTap: () {
+          onTap: onTapAction ?? () {
             if (isLogout) {
-              // 🚨 ACCIÓN DE CERRAR SESIÓN
-              AuthService.logout(); // Limpiar el estado de sesión (userId = null)
-
-              // Navega al Login y elimina el historial de navegación
+              AuthService.logout(); 
               Navigator.pushAndRemoveUntil(
                 context,
                 MaterialPageRoute(builder: (context) => const LoginView()),
                 (Route<dynamic> route) => false,
               );
             } else if (title == 'Editar Datos y Preferencias') {
-              // NAVEGACIÓN a SettingsView
               Navigator.push(
                 context,
                 MaterialPageRoute(builder: (context) => const SettingsView()),
-              );
+              ).then((_) => _loadProfileData()); 
             } else if (title == 'Progreso') {
-              // NAVEGACIÓN a ProgressView
               Navigator.push(
                 context,
                 MaterialPageRoute(builder: (context) => const ProgressView()),
               );
             }
-            // Agrega más lógica de navegación aquí si es necesario (Evaluaciones, Estadísticas, Social)
           },
         ),
       ),
@@ -138,44 +158,75 @@ class ProfileView extends StatelessWidget {
         elevation: 0,
         iconTheme: const IconThemeData(color: Colors.white),
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            // 1. Sección de Avatar y Estadísticas (HU-11.2)
-            _buildAvatarSection(context, primaryColor),
-            
-            const SizedBox(height: 30),
-            
-            // 2. Opciones de Perfil/Navegación
-            _buildProfileOption(context, 'Progreso', Icons.timeline, cardColor, primaryColor), 
-            _buildProfileOption(context, 'Evaluaciones', Icons.checklist, cardColor, primaryColor), 
-            _buildProfileOption(context, 'Estadísticas', Icons.bar_chart, cardColor, primaryColor), 
-            _buildProfileOption(context, 'Social', Icons.people_outline, cardColor, primaryColor), 
-            
-            const SizedBox(height: 30),
+      body: FutureBuilder<UserProfileData>(
+        future: _futureProfileData,
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return Center(child: CircularProgressIndicator(color: primaryColor));
+          }
+          
+          if (snapshot.hasError) {
+             // Muestra error y permite recargar (HU-11.2)
+             return Center(
+                child: Padding(
+                  padding: const EdgeInsets.all(30.0),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                       Text(
+                         'Error al cargar perfil. Asegúrate de que el backend esté activo.',
+                         textAlign: TextAlign.center,
+                         style: const TextStyle(color: Colors.red),
+                       ),
+                       const SizedBox(height: 20),
+                       ElevatedButton(onPressed: _loadProfileData, child: const Text('Recargar Perfil'))
+                    ],
+                  ),
+                ));
+          }
 
-            // 3. Sección de Configuración (HU-11.3)
-            Align(
-              alignment: Alignment.centerLeft,
-              child: Text(
-                'Configuración',
-                style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                  color: Colors.white70, 
-                  fontWeight: FontWeight.bold
+          final profile = snapshot.data!;
+
+          return SingleChildScrollView(
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                // 1. Sección de Avatar y Estadísticas Reales
+                _buildAvatarSection(context, primaryColor, profile),
+                
+                const SizedBox(height: 30),
+                
+                // 2. Opciones de Perfil/Navegación
+                _buildProfileOption(context, 'Progreso', Icons.timeline, cardColor, primaryColor), 
+                _buildProfileOption(context, 'Evaluaciones', Icons.checklist, cardColor, primaryColor), 
+                _buildProfileOption(context, 'Estadísticas', Icons.bar_chart, cardColor, primaryColor), 
+                _buildProfileOption(context, 'Social', Icons.people_outline, cardColor, primaryColor), 
+                
+                const SizedBox(height: 30),
+
+                // 3. Sección de Configuración (HU-11.3)
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    'Configuración',
+                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                      color: Colors.white70, 
+                      fontWeight: FontWeight.bold
+                    ),
+                  ),
                 ),
-              ),
+                const SizedBox(height: 10),
+                
+                _buildProfileOption(context, 'Editar Datos y Preferencias', Icons.settings, cardColor, primaryColor),
+                _buildProfileOption(context, 'Privacidad', Icons.lock_outline, cardColor, primaryColor),
+                
+                // 4. Opción de Cerrar Sesión
+                _buildProfileOption(context, 'Cerrar Sesión', Icons.logout, cardColor, primaryColor, isLogout: true),
+              ],
             ),
-            const SizedBox(height: 10),
-            
-            _buildProfileOption(context, 'Editar Datos y Preferencias', Icons.settings, cardColor, primaryColor),
-            _buildProfileOption(context, 'Privacidad', Icons.lock_outline, cardColor, primaryColor),
-            
-            // 4. Opción de Cerrar Sesión (Llama a AuthService.logout())
-            _buildProfileOption(context, 'Cerrar Sesión', Icons.logout, cardColor, primaryColor, isLogout: true),
-          ],
-        ),
+          );
+        },
       ),
     );
   }

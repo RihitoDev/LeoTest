@@ -13,7 +13,6 @@ class AdminHomeView extends StatelessWidget {
     );
   }
 
-  // NUEVA FUNCIÓN PARA MOSTRAR EL DIÁLOGO
   void _showAddCategoryDialog(BuildContext context) {
     final TextEditingController controller = TextEditingController();
     
@@ -39,11 +38,9 @@ class AdminHomeView extends StatelessWidget {
               onPressed: () {
                 final nombre = controller.text.trim();
                 if (nombre.isNotEmpty) {
-                  // Llama a la función que crea la categoría
                   _createCategory(context, nombre);
                   Navigator.of(dialogContext).pop();
                 } else {
-                  // Muestra un mensaje si el campo está vacío
                   ScaffoldMessenger.of(dialogContext).showSnackBar(
                     const SnackBar(content: Text('El nombre no puede estar vacío.')),
                   );
@@ -56,13 +53,11 @@ class AdminHomeView extends StatelessWidget {
     );
   }
 
-  // NUEVA FUNCIÓN PARA LLAMAR A LA API
   Future<void> _createCategory(BuildContext context, String name) async {
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text('Creando categoría...')),
     );
     
-    // Necesitas una clase BookService que tenga el método crearCategoria
     final success = await BookService.crearCategoria(name); 
 
     ScaffoldMessenger.of(context).hideCurrentSnackBar();
@@ -80,7 +75,6 @@ class AdminHomeView extends StatelessWidget {
       );
     }
   }
-
 
   @override
   Widget build(BuildContext context) {
@@ -108,7 +102,6 @@ class AdminHomeView extends StatelessWidget {
                   color: Colors.white),
             ),
             const SizedBox(height: 40),
-            // Botón para ir a la subida de libros
             ElevatedButton.icon(
               icon: const Icon(Icons.cloud_upload),
               label: const Text('Subir Nuevo Libro'),
@@ -122,12 +115,11 @@ class AdminHomeView extends StatelessWidget {
               },
             ),
             const SizedBox(height: 20),
-            // Botón para gestionar categorías
             ElevatedButton.icon(
               icon: const Icon(Icons.category),
               label: const Text('Añadir Categorías'),
               onPressed: () {
-                _showAddCategoryDialog(context); // <-- ¡LLAMADA A LA NUEVA FUNCIÓN!
+                _showAddCategoryDialog(context);
               },
             ),
           ],
