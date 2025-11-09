@@ -1,5 +1,4 @@
 // leotest-backend/src/routes/libros.routes.js
-
 import express from "express";
 import { 
     buscarLibros, 
@@ -9,6 +8,7 @@ import {
     obtenerNiveles,
     crearCategoria 
 } from "../controllers/libros.controller.js";
+import { procesarCapitulos } from "../controllers/procesarCapitulos.controller.js";
 
 const router = express.Router();
 
@@ -18,5 +18,7 @@ router.post("/subir", uploadLibroMiddleware, subirLibro);
 router.get("/categorias", obtenerCategorias);
 router.post("/categorias", crearCategoria); 
 router.get("/niveles", obtenerNiveles);
+router.post("/:id_libro/procesar-capitulos", procesarCapitulos);
+
 
 export default router;

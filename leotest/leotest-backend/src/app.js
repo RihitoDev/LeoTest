@@ -5,8 +5,8 @@ import librosRoutes from "./routes/libros.routes.js";
 import authRoutes from "./routes/auth.routes.js"; 
 import progressRoutes from './routes/progress.routes.js'; 
 import favoritosRoutes from './routes/favoritos.routes.js';
-
-
+import profileRoutes from "./routes/profile.routes.js";
+import nivelEducativoRoutes from "./routes/nivel_educativo.routes.js";
 
 dotenv.config();
 
@@ -21,7 +21,8 @@ app.use('/api/progress', progressRoutes);
 app.use("/api/libros", librosRoutes);
 app.use("/api/auth", authRoutes); 
 app.use('/api/favoritos', favoritosRoutes);
-
+app.use("/api/profile", profileRoutes);
+app.use("/api/nivel_educativo", nivelEducativoRoutes);
 
 app.listen(PORT, '0.0.0.0', () => {
     // ...

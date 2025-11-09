@@ -1,6 +1,7 @@
 // lib/views/my_books_view.dart
 
 import 'package:flutter/material.dart';
+import 'package:leotest/models/perfil.dart';
 import '../models/book.dart';
 import '../views/book_reader_view.dart';
 import '../widgets/book_progress_card.dart';
@@ -71,7 +72,9 @@ class _DummySearchDelegate extends SearchDelegate<String> {
 // VISTA PRINCIPAL: MYBOOKSVIEW
 // =========================================================================
 class MyBooksView extends StatefulWidget {
-  const MyBooksView({super.key});
+  final Perfil perfil; // <-- recibe el perfil
+
+  const MyBooksView({super.key, required this.perfil});
 
   @override
   State<MyBooksView> createState() => _MyBooksViewState();
@@ -80,38 +83,43 @@ class MyBooksView extends StatefulWidget {
 class _MyBooksViewState extends State<MyBooksView> {
   late Future<List<UserBookProgress>> _futureUserBooks;
   Set<int> favoritosSet = {};
-  final int idPerfil = 2; // Temporal
-  
+  late final int idPerfil;
+
   // Futures para datos dinámicos
   late Future<int> _futureBooksRead;
   late Future<int> _futureCurrentStreak;
   late Future<List<AppNotification>> _futureNotifications; // Nuevo Future
-  
+
   bool _isDeleting = false; // Estado para evitar recargas mientras se borra
 
   @override
   void initState() {
     super.initState();
+    idPerfil = widget.perfil.id; // usar el id del perfil recibido
     _loadStatsAndNotifications();
   }
 
   void _loadStatsAndNotifications() {
-     if (mounted) {
-        setState(() {
-          _futureUserBooks = MyBooksService.getUserBooks();
-          _cargarFavoritos();
-          // Recargar futures de estadísticas
-          _futureBooksRead = StatsService.fetchGeneralStats().then((stats) => stats.librosLeidos ?? 0);
-          _futureCurrentStreak = StatsService.fetchCurrentStreak();
-          _futureNotifications = NotificationService.fetchNotifications();
-        });
-     }
+    if (mounted) {
+      setState(() {
+        _futureUserBooks = MyBooksService.getUserBooks();
+        _cargarFavoritos();
+        // Recargar futures de estadísticas
+        _futureBooksRead = StatsService.fetchGeneralStats().then(
+          (stats) => stats.librosLeidos ?? 0,
+        );
+        _futureCurrentStreak = StatsService.fetchCurrentStreak();
+        _futureNotifications = NotificationService.fetchNotifications();
+      });
+    }
   }
 
   Future<void> _cargarFavoritos() async {
     if (!mounted) return;
     try {
-      final favoritos = await FavoritoService.obtenerFavoritos(idPerfil: idPerfil);
+      final favoritos = await FavoritoService.obtenerFavoritos(
+        idPerfil: idPerfil,
+      );
       if (mounted) {
         setState(() => favoritosSet = favoritos.toSet());
       }
@@ -134,14 +142,21 @@ class _MyBooksViewState extends State<MyBooksView> {
 
     try {
       if (eraFavorito) {
-        await FavoritoService.quitarFavorito(idPerfil: idPerfil, idLibro: book.idLibro);
+        await FavoritoService.quitarFavorito(
+          idPerfil: idPerfil,
+          idLibro: book.idLibro,
+        );
       } else {
-        await FavoritoService.agregarFavorito(idPerfil: idPerfil, idLibro: book.idLibro);
+        await FavoritoService.agregarFavorito(
+          idPerfil: idPerfil,
+          idLibro: book.idLibro,
+        );
       }
     } catch (e) {
       print('Error al actualizar favorito: $e');
       if (mounted) {
-        setState(() { // Revertir UI
+        setState(() {
+          // Revertir UI
           if (eraFavorito) {
             favoritosSet.add(book.idLibro);
           } else {
@@ -163,7 +178,9 @@ class _MyBooksViewState extends State<MyBooksView> {
     }
   }
 
-  Future<void> _showDeleteConfirmationDialog(UserBookProgress bookToDelete) async {
+  Future<void> _showDeleteConfirmationDialog(
+    UserBookProgress bookToDelete,
+  ) async {
     if (_isDeleting) return;
 
     final bool? confirmed = await showDialog<bool>(
@@ -172,20 +189,29 @@ class _MyBooksViewState extends State<MyBooksView> {
       builder: (BuildContext dialogContext) {
         return AlertDialog(
           backgroundColor: Theme.of(context).colorScheme.surface,
-          title: const Text('Confirmar Eliminación', style: TextStyle(color: Colors.white)),
+          title: const Text(
+            'Confirmar Eliminación',
+            style: TextStyle(color: Colors.white),
+          ),
           content: Text(
             '¿Estás seguro de que quieres eliminar "${bookToDelete.title}" de tu biblioteca? Se perderá tu progreso de lectura.',
-             style: const TextStyle(color: Colors.white70)
+            style: const TextStyle(color: Colors.white70),
           ),
           actions: <Widget>[
             TextButton(
-              child: const Text('Cancelar', style: TextStyle(color: Colors.grey)),
+              child: const Text(
+                'Cancelar',
+                style: TextStyle(color: Colors.grey),
+              ),
               onPressed: () {
                 Navigator.of(dialogContext).pop(false);
               },
             ),
             TextButton(
-              child: const Text('Eliminar', style: TextStyle(color: Colors.redAccent)),
+              child: const Text(
+                'Eliminar',
+                style: TextStyle(color: Colors.redAccent),
+              ),
               onPressed: () {
                 Navigator.of(dialogContext).pop(true);
               },
@@ -196,7 +222,7 @@ class _MyBooksViewState extends State<MyBooksView> {
     );
 
     if (confirmed == true) {
-      if(mounted) {
+      if (mounted) {
         setState(() => _isDeleting = true);
       }
 
@@ -207,35 +233,42 @@ class _MyBooksViewState extends State<MyBooksView> {
         ),
       );
 
-      final bool success = await MyBooksService.deleteBookProgress(idLibro: bookToDelete.idLibro);
+      final bool success = await MyBooksService.deleteBookProgress(
+        idLibro: bookToDelete.idLibro,
+      );
 
       ScaffoldMessenger.of(context).hideCurrentSnackBar();
 
       if (mounted) {
-          setState(() => _isDeleting = false);
+        setState(() => _isDeleting = false);
 
-          if (success) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text('"${bookToDelete.title}" eliminado con éxito.'),
-                backgroundColor: Colors.green[700],
+        if (success) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('"${bookToDelete.title}" eliminado con éxito.'),
+              backgroundColor: Colors.green[700],
+            ),
+          );
+          _reloadBooks();
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                'Error al eliminar "${bookToDelete.title}". Inténtalo de nuevo.',
               ),
-            );
-            _reloadBooks();
-          } else {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text('Error al eliminar "${bookToDelete.title}". Inténtalo de nuevo.'),
-                backgroundColor: Colors.redAccent,
-              ),
-            );
-          }
+              backgroundColor: Colors.redAccent,
+            ),
+          );
+        }
       }
     }
   }
 
   // Widget para el Panel de Notificaciones (HU-1.3)
-  void _showNotificationPanel(BuildContext context, List<AppNotification> notifications) {
+  void _showNotificationPanel(
+    BuildContext context,
+    List<AppNotification> notifications,
+  ) {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -254,7 +287,10 @@ class _MyBooksViewState extends State<MyBooksView> {
                     padding: const EdgeInsets.all(16.0),
                     child: Text(
                       'Alertas y Notificaciones',
-                      style: Theme.of(context).textTheme.titleLarge?.copyWith(color: Colors.white, fontWeight: FontWeight.bold),
+                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                   ),
                   Expanded(
@@ -266,15 +302,41 @@ class _MyBooksViewState extends State<MyBooksView> {
                         final isUnread = notification.estado != 'leída';
                         return ListTile(
                           leading: Icon(
-                            notification.tipo == 'mision' ? Icons.check_circle_outline : Icons.notifications_none,
-                            color: isUnread ? Theme.of(context).colorScheme.primary : Colors.grey,
+                            notification.tipo == 'mision'
+                                ? Icons.check_circle_outline
+                                : Icons.notifications_none,
+                            color: isUnread
+                                ? Theme.of(context).colorScheme.primary
+                                : Colors.grey,
                           ),
-                          title: Text(notification.mensaje, style: TextStyle(color: isUnread ? Colors.white : Colors.white70, fontWeight: isUnread ? FontWeight.bold : FontWeight.normal)),
-                          subtitle: Text('Tipo: ${notification.tipo} - ${notification.fecha}', style: const TextStyle(color: Colors.grey, fontSize: 12)),
-                          trailing: isUnread ? const Icon(Icons.circle, size: 10, color: Colors.redAccent) : null,
+                          title: Text(
+                            notification.mensaje,
+                            style: TextStyle(
+                              color: isUnread ? Colors.white : Colors.white70,
+                              fontWeight: isUnread
+                                  ? FontWeight.bold
+                                  : FontWeight.normal,
+                            ),
+                          ),
+                          subtitle: Text(
+                            'Tipo: ${notification.tipo} - ${notification.fecha}',
+                            style: const TextStyle(
+                              color: Colors.grey,
+                              fontSize: 12,
+                            ),
+                          ),
+                          trailing: isUnread
+                              ? const Icon(
+                                  Icons.circle,
+                                  size: 10,
+                                  color: Colors.redAccent,
+                                )
+                              : null,
                           onTap: () async {
                             if (isUnread) {
-                              await NotificationService.markAsRead(notification.id);
+                              await NotificationService.markAsRead(
+                                notification.id,
+                              );
                               _loadStatsAndNotifications(); // Recarga para actualizar el conteo
                               Navigator.pop(modalContext); // Cierra el modal
                             }
@@ -292,7 +354,6 @@ class _MyBooksViewState extends State<MyBooksView> {
     );
   }
 
-
   @override
   Widget build(BuildContext context) {
     final primaryColor = Theme.of(context).colorScheme.primary;
@@ -302,6 +363,12 @@ class _MyBooksViewState extends State<MyBooksView> {
         backgroundColor: const Color.fromARGB(255, 0, 4, 8),
         elevation: 1,
         automaticallyImplyLeading: false,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: Colors.white),
+          onPressed: () {
+            Navigator.pop(context);
+          },
+        ),
         title: Text(
           'Mi Biblioteca',
           style: TextStyle(fontWeight: FontWeight.w900, color: primaryColor),
@@ -312,13 +379,19 @@ class _MyBooksViewState extends State<MyBooksView> {
             future: _futureNotifications,
             builder: (context, snapshot) {
               final notifications = snapshot.data ?? [];
-              final unreadCount = notifications.where((n) => n.estado != 'leída').length;
+              final unreadCount = notifications
+                  .where((n) => n.estado != 'leída')
+                  .length;
 
               return IconButton(
                 icon: Stack(
                   alignment: Alignment.topRight,
                   children: [
-                    const Icon(Icons.notifications_outlined, color: Colors.white70, size: 28),
+                    const Icon(
+                      Icons.notifications_outlined,
+                      color: Colors.white70,
+                      size: 28,
+                    ),
                     if (unreadCount > 0)
                       Container(
                         padding: const EdgeInsets.all(3),
@@ -326,8 +399,18 @@ class _MyBooksViewState extends State<MyBooksView> {
                           color: Colors.red,
                           borderRadius: BorderRadius.circular(9),
                         ),
-                        constraints: const BoxConstraints(minWidth: 18, minHeight: 18),
-                        child: Text('$unreadCount', style: const TextStyle(color: Colors.white, fontSize: 10), textAlign: TextAlign.center),
+                        constraints: const BoxConstraints(
+                          minWidth: 18,
+                          minHeight: 18,
+                        ),
+                        child: Text(
+                          '$unreadCount',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 10,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
                       ),
                   ],
                 ),
@@ -335,7 +418,7 @@ class _MyBooksViewState extends State<MyBooksView> {
               );
             },
           ),
-          
+
           // Integración: Libros Leídos
           FutureBuilder<int>(
             future: _futureBooksRead,
@@ -358,7 +441,7 @@ class _MyBooksViewState extends State<MyBooksView> {
               );
             },
           ),
-          
+
           // Integración: Racha
           FutureBuilder<int>(
             future: _futureCurrentStreak,
@@ -368,7 +451,10 @@ class _MyBooksViewState extends State<MyBooksView> {
                 padding: const EdgeInsets.symmetric(horizontal: 12.0),
                 child: Row(
                   children: [
-                    const Icon(Icons.local_fire_department, color: Colors.orange),
+                    const Icon(
+                      Icons.local_fire_department,
+                      color: Colors.orange,
+                    ),
                     Text(
                       '$currentStreak',
                       style: const TextStyle(
@@ -381,7 +467,7 @@ class _MyBooksViewState extends State<MyBooksView> {
               );
             },
           ),
-          
+
           IconButton(
             tooltip: 'Refrescar biblioteca',
             icon: const Icon(Icons.refresh, color: Colors.white70),
@@ -396,6 +482,7 @@ class _MyBooksViewState extends State<MyBooksView> {
           ),
         ],
       ),
+
       body: Container(
         color: const Color.fromARGB(255, 3, 0, 12),
         child: FutureBuilder<List<UserBookProgress>>(
@@ -413,43 +500,46 @@ class _MyBooksViewState extends State<MyBooksView> {
                   padding: const EdgeInsets.all(20.0),
                   child: Text(
                     'Ocurrió un error al cargar tu biblioteca:\n${snapshot.error}',
-                    style: const TextStyle(color: Colors.redAccent, fontSize: 16),
+                    style: const TextStyle(
+                      color: Colors.redAccent,
+                      fontSize: 16,
+                    ),
                     textAlign: TextAlign.center,
                   ),
                 ),
               );
             }
 
-             final userBooks = snapshot.data ?? [];
+            final userBooks = snapshot.data ?? [];
 
-             if (userBooks.isEmpty) {
+            if (userBooks.isEmpty) {
               return Center(
                 child: RefreshIndicator(
-                   onRefresh: () async {
-                      _reloadBooks();
-                      await _futureUserBooks;
-                   },
+                  onRefresh: () async {
+                    _reloadBooks();
+                    await _futureUserBooks;
+                  },
                   child: ListView(
-                     physics: const AlwaysScrollableScrollPhysics(),
-                     children: const [
-                       Padding(
-                         padding: EdgeInsets.all(30.0),
-                         child: Text(
-                           'Tu biblioteca está vacía. ¡Inicia una lectura desde el catálogo principal!',
-                           style: TextStyle(color: Colors.white70, fontSize: 18),
-                           textAlign: TextAlign.center,
-                         ),
-                       ),
-                     ],
-                   ),
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    children: const [
+                      Padding(
+                        padding: EdgeInsets.all(30.0),
+                        child: Text(
+                          'Tu biblioteca está vacía. ¡Inicia una lectura desde el catálogo principal!',
+                          style: TextStyle(color: Colors.white70, fontSize: 18),
+                          textAlign: TextAlign.center,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               );
             }
 
             return RefreshIndicator(
               onRefresh: () async {
-                 _reloadBooks();
-                 await _futureUserBooks;
+                _reloadBooks();
+                await _futureUserBooks;
               },
               color: primaryColor,
               backgroundColor: const Color.fromARGB(255, 10, 10, 30),
@@ -490,13 +580,18 @@ class _MyBooksViewState extends State<MyBooksView> {
                       );
 
                       if (result == true && mounted) {
-                        print("Recargando biblioteca porque se guardó progreso...");
+                        print(
+                          "Recargando biblioteca porque se guardó progreso...",
+                        );
                         _reloadBooks();
                       } else {
-                         print("No se recarga biblioteca (resultado: $result o widget desmontado)");
+                        print(
+                          "No se recarga biblioteca (resultado: $result o widget desmontado)",
+                        );
                       }
                     },
-                    onDeleteTapped: () => _showDeleteConfirmationDialog(bookProgress),
+                    onDeleteTapped: () =>
+                        _showDeleteConfirmationDialog(bookProgress),
                   );
                 },
               ),
