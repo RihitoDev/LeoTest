@@ -1,24 +1,23 @@
 // leotest-backend/src/controllers/libros.controller.js
 
 import pool from "../db/connection.js";
-import { supabase } from "../db/supabaseClient.js"; // Importa el cliente de Supabase
+import { supabase } from "../db/supabaseClient.js"; 
 import multer from 'multer';
+import { triggerBookProcessing } from "./ia.controller.js"; // Importa el disparador de IA
 
 // ----------------------------------------------------
 // 1. MIDDLEWARE DE SUBIDA DE ARCHIVOS (MULTER)
 // ----------------------------------------------------
 
-// Configuración de Multer para ALMACENAMIENTO EN MEMORIA
 const storage = multer.memoryStorage();
 
-// MIDDLEWARE: Acepta dos campos de archivo: 'archivo' (libro) y 'portada' (imagen)
 export const uploadLibroMiddleware = multer({ storage: storage }).fields([
     { name: 'archivo', maxCount: 1 }, // El archivo PDF/ePub del libro
     { name: 'portada', maxCount: 1 }  // El archivo de imagen (portada)
 ]); 
 
 // ----------------------------------------------------
-// 2. LÓGICA DE SUBIDA DEL LIBRO Y PORTADA
+// 2. LÓGICA DE SUBIDA DEL LIBRO Y PROCESAMIENTO ASÍNCRONO
 // ----------------------------------------------------
 
 export const subirLibro = async (req, res) => {
@@ -31,10 +30,8 @@ export const subirLibro = async (req, res) => {
     // Archivos subidos (req.files)
     const archivos = req.files; 
     
-    // BUCKET CONFIGURADO: Usamos el bucket 'leoTest'
     const BUCKET_NAME = 'leoTest'; 
     
-    // Verificación de archivos
     const libroFile = archivos?.archivo ? archivos.archivo[0] : null;
     const portadaFile = archivos?.portada ? archivos.portada[0] : null;
 
@@ -42,17 +39,15 @@ export const subirLibro = async (req, res) => {
         return res.status(400).json({ error: "Debe proporcionar tanto el archivo del libro como la portada." });
     }
 
-    // Inicialización de rutas y URLs
     let bookPublicUrl = null;
     let coverPublicUrl = null;
     const safeTitle = titulo.trim().toLowerCase().replace(/[^a-z0-9]/g, '_');
     
-    // Rutas para limpieza en caso de error
     let bookPath = null;
     let coverPath = null;
 
     try {
-        // --- A. SUBIDA DEL ARCHIVO DEL LIBRO ---
+        // --- A. SUBIDA DEL ARCHIVO DEL LIBRO Y PORTADA (Supabase Storage) ---
         const bookExtension = libroFile.originalname.split('.').pop();
         bookPath = `libros/${safeTitle}-${Date.now()}.${bookExtension}`; 
 
@@ -67,11 +62,9 @@ export const subirLibro = async (req, res) => {
             console.error("Error de Supabase Storage (Libro):", bookUploadError);
             throw new Error(`Error al subir el libro: ${bookUploadError.message}`);
         }
-        
         bookPublicUrl = supabase.storage.from(BUCKET_NAME).getPublicUrl(bookPath).data.publicUrl;
 
 
-        // --- B. SUBIDA DEL ARCHIVO DE LA PORTADA ---
         const coverExtension = portadaFile.originalname.split('.').pop();
         coverPath = `portadas/${safeTitle}-${Date.now()}.${coverExtension}`; 
 
@@ -83,45 +76,44 @@ export const subirLibro = async (req, res) => {
             });
 
         if (coverUploadError) {
-            // Limpieza del libro subido si falla la portada
             await supabase.storage.from(BUCKET_NAME).remove([bookPath]);
             throw new Error(`Error al subir la portada: ${coverUploadError.message}`);
         }
-        
         coverPublicUrl = supabase.storage.from(BUCKET_NAME).getPublicUrl(coverPath).data.publicUrl;
 
 
-        // --- C. INSERTAR DATOS DEL LIBRO EN POSTGRES (CORREGIDO) ---
+        // --- B. INSERTAR DATOS DEL LIBRO EN POSTGRES ---
         const query = `
             INSERT INTO libro 
             (titulo, autor, descripcion, id_categoria, id_nivel_educativo, ruta_archivo, portada, total_paginas, total_capitulos, fecha_registro)
             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW())
-            RETURNING *;
+            RETURNING id_libro; 
         `;
-        // El array 'values' solo tiene 9 elementos, ya que NOW() reemplaza al décimo placeholder.
         const values = [
-            titulo,                 // $1
-            autor,                  // $2
-            descripcion,            // $3
-            id_categoria,           // $4
-            id_nivel_educativo,     // $5
-            bookPublicUrl,          // $6 (Columna: ruta_archivo)
-            coverPublicUrl,         // $7 (Columna: portada)
-            total_paginas || 0,     // $8
-            total_capitulos || 0    // $9
+            titulo, autor, descripcion, id_categoria, id_nivel_educativo,
+            bookPublicUrl, coverPublicUrl, total_paginas || 0, total_capitulos || 0
         ];
 
-        await pool.query(query, values);
+        const dbResult = await pool.query(query, values);
+        const idLibroGenerado = dbResult.rows[0].id_libro; 
+
+        // ✅ DISPARAR EL PROCESAMIENTO ASÍNCRONO DEL LIBRO DE IA
+        // Se llama sin 'await' para no bloquear la respuesta HTTP
+        triggerBookProcessing(
+            idLibroGenerado, 
+            bookPublicUrl, 
+            total_capitulos || 1
+        );
 
         res.status(201).json({ 
             exito: true, 
-            mensaje: "Libro y portada subidos con éxito", 
+            mensaje: "Libro subido, procesamiento de IA iniciado.",
+            id_libro: idLibroGenerado
         });
 
     } catch (error) {
         console.error("Error general en subirLibro:", error.message);
         
-        // Limpieza de archivos si algo falló
         const filesToRemove = [];
         if (bookPath && !bookPublicUrl) filesToRemove.push(bookPath);
         if (coverPath && !coverPublicUrl) filesToRemove.push(coverPath);
@@ -140,15 +132,13 @@ export const subirLibro = async (req, res) => {
 
 
 // ----------------------------------------------------
-// 3. OTRAS FUNCIONES CRUD Y BÚSQUEDA
+// 3. FUNCIONES DE CATÁLOGO Y BÚSQUEDA
 // ----------------------------------------------------
 
-// Buscar libros (búsqueda general y por categoría)
 export const buscarLibros = async (req, res) => {
   try {
     let { query, categoriaId } = req.query;
 
-    // limpieza de texto
     query = query ? query.trim() : null;
     categoriaId = categoriaId ? parseInt(categoriaId) : null;
 
@@ -172,7 +162,7 @@ export const buscarLibros = async (req, res) => {
 
     if (query) {
       const q = `%${query}%`;
-      params.push(q, q, q); // para titulo, autor y categoria
+      params.push(q, q, q);
       sql += ` AND (
         l.titulo ILIKE $${params.length - 2} 
         OR l.autor ILIKE $${params.length - 1} 
@@ -238,5 +228,49 @@ export const obtenerNiveles = async (req, res) => {
         res.json(result.rows);
     } catch (e) {
         res.status(500).json({ error: e.message });
+    }
+};
+export const createChapterInternal = async (req, res) => {
+    const { id_libro, numero_capitulo, titulo_capitulo, contenido_texto } = req.body;
+
+    if (!id_libro || !numero_capitulo || !titulo_capitulo || !contenido_texto) {
+        return res.status(400).json({ mensaje: "Datos de capítulo incompletos." });
+    }
+
+    const client = await pool.connect();
+    try {
+        await client.query('BEGIN');
+        
+        // 1. Insertar en tabla 'capitulo'
+        const chapterQuery = `
+            INSERT INTO capitulo (id_libro, numero_capitulo, titulo_capitulo)
+            VALUES ($1, $2, $3)
+            RETURNING id_capitulo;
+        `;
+        const chapterResult = await client.query(chapterQuery, [id_libro, numero_capitulo, titulo_capitulo]);
+        const idCapitulo = chapterResult.rows[0].id_capitulo;
+
+        // 2. Insertar el texto extraído en la tabla 'capitulo_embedding'
+        const embeddingQuery = `
+            INSERT INTO capitulo_embedding (id_capitulo, contenido_texto)
+            VALUES ($1, $2);
+        `;
+        // Nota: Omitimos la columna 'embedding' (USER-DEFINED) que requiere librerías vectoriales
+        await client.query(embeddingQuery, [idCapitulo, contenido_texto]); 
+
+        await client.query('COMMIT');
+
+        res.status(201).json({ 
+            exito: true, 
+            id_capitulo: idCapitulo,
+            mensaje: "Capítulo y contenido guardados con éxito."
+        });
+
+    } catch (error) {
+        await client.query('ROLLBACK');
+        console.error("Error interno al crear capítulo:", error);
+        res.status(500).json({ mensaje: "Error interno al guardar el capítulo." });
+    } finally {
+        client.release();
     }
 };

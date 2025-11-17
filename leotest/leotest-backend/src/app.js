@@ -15,7 +15,7 @@ import notificationRoutes from './routes/notification.routes.js'; // ✅ Importa
 import profileRoutes from './routes/profile.routes.js';      // ✅ Importado
 
 // Asumimos que también tenemos la ruta de IA (ya que es parte de tu arquitectura)
-//import iaRoutes from './routes/ia.routes.js';              // ✅ Importado
+import iaRoutes from './routes/ia.routes.js';              // ✅ Importado
 
 
 // 3. Configurar dotenv
@@ -43,7 +43,7 @@ app.use('/api/notifications', notificationRoutes);
 app.use('/api/profile', profileRoutes);
 
 // Ruta de IA (Para futura integración/controlador de libros)
-//pp.use('/api/ia', iaRoutes); 
+app.use('/api/ia', iaRoutes); 
 
 
 // 7. INICIO DEL SERVIDOR

@@ -7,7 +7,8 @@ import {
     uploadLibroMiddleware, 
     obtenerCategorias, 
     obtenerNiveles,
-    crearCategoria 
+    crearCategoria,
+    createChapterInternal 
 } from "../controllers/libros.controller.js";
 
 const router = express.Router();
@@ -18,5 +19,5 @@ router.post("/subir", uploadLibroMiddleware, subirLibro);
 router.get("/categorias", obtenerCategorias);
 router.post("/categorias", crearCategoria); 
 router.get("/niveles", obtenerNiveles);
-
+router.post("/internal/chapter", createChapterInternal);
 export default router;
