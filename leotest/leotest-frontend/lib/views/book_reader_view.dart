@@ -5,14 +5,21 @@ import 'package:leotest/main.dart';
 import 'package:leotest/models/book.dart';
 import 'package:leotest/services/my_books_service.dart';
 import 'package:leotest/services/stats_service.dart';
+import 'package:leotest/views/chapter_list_view.dart';
 import 'package:syncfusion_flutter_pdfviewer/pdfviewer.dart';
 import 'package:intl/intl.dart';
 
 class BookReaderView extends StatefulWidget {
   final Book book;
   final int initialPage;
+  final int idPerfil; // 🔹 NUEVO PARÁMETRO
 
-  const BookReaderView({super.key, required this.book, this.initialPage = 0});
+  const BookReaderView({
+    super.key,
+    required this.book,
+    this.initialPage = 0,
+    required this.idPerfil, // 🔹 requerido
+  });
 
   @override
   State<BookReaderView> createState() => _BookReaderViewState();
@@ -48,7 +55,7 @@ class _BookReaderViewState extends State<BookReaderView> {
   @override
   void dispose() {
     // Llamada sin await, pero la función _saveProgress es la que maneja la asyncronía
-    _saveProgress(); 
+    _saveProgress();
     _pdfController.dispose();
     super.dispose(); // ✅ Asegura que se llama a super.dispose()
   }
@@ -84,11 +91,11 @@ class _BookReaderViewState extends State<BookReaderView> {
   // ✅ CORRECCIÓN 3: El exitReader ahora sí es async para asegurar el guardado
   Future<void> _exitReaderAndSignal() async {
     // 1. Espera a que el guardado termine ANTES de cerrar la pantalla
-    await _saveProgress(); 
+    await _saveProgress();
 
     if (mounted) {
       // 2. Devuelve si se guardó progreso o no
-      Navigator.of(context).pop(_progressWasSaved); 
+      Navigator.of(context).pop(_progressWasSaved);
     }
   }
 
@@ -100,7 +107,7 @@ class _BookReaderViewState extends State<BookReaderView> {
     final pdfUrlEscaped = pdfUrl != null ? Uri.encodeFull(pdfUrl) : null;
 
     if (pdfUrlEscaped == null || pdfUrlEscaped.isEmpty) {
-       return Scaffold(
+      return Scaffold(
         appBar: AppBar(title: Text(widget.book.titulo ?? "Error")),
         backgroundColor: const Color.fromARGB(255, 3, 0, 12),
         body: const Center(
@@ -221,7 +228,7 @@ class _BookReaderViewState extends State<BookReaderView> {
                   Align(
                     alignment: Alignment.centerRight,
                     child: Text(
-                      progressPercent, 
+                      progressPercent,
                       style: const TextStyle(
                         color: Colors.white70,
                         fontSize: 12,
@@ -240,7 +247,7 @@ class _BookReaderViewState extends State<BookReaderView> {
                   vertical: 10,
                 ),
                 child: Container(
-                   decoration: BoxDecoration(
+                  decoration: BoxDecoration(
                     color: Colors.white,
                     borderRadius: BorderRadius.circular(5),
                     boxShadow: [
@@ -251,7 +258,7 @@ class _BookReaderViewState extends State<BookReaderView> {
                       ),
                     ],
                   ),
-                   child: SfPdfViewer.network(
+                  child: SfPdfViewer.network(
                     pdfUrlEscaped,
                     controller: _pdfController,
                     pageSpacing: 0,
@@ -262,7 +269,7 @@ class _BookReaderViewState extends State<BookReaderView> {
                       );
                     },
                     onPageChanged: (details) {
-                      if(mounted){
+                      if (mounted) {
                         setState(() {
                           _currentPage = details.newPageNumber - 1;
                           if (_currentPage > _maxPageRead) {
@@ -296,14 +303,14 @@ class _BookReaderViewState extends State<BookReaderView> {
                     ),
                   ),
                   IconButton(
-                    tooltip: 'Guardar marcador', 
+                    tooltip: 'Guardar marcador',
                     onPressed: () {
                       ScaffoldMessenger.of(context).showSnackBar(
                         SnackBar(
                           content: Text(
                             'Marcador guardado en la página ${_currentPage + 1}',
                           ),
-                           duration: const Duration(seconds: 1), 
+                          duration: const Duration(seconds: 1),
                         ),
                       );
                     },
@@ -326,12 +333,16 @@ class _BookReaderViewState extends State<BookReaderView> {
                     ),
                   ),
                   IconButton(
-                    tooltip: 'Ir a Evaluación (No implementado)',
+                    tooltip: 'Ir a Evaluación',
                     onPressed: () {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('FUNCIONALIDAD PENDIENTE: Evaluación del Libro'),
-                           backgroundColor: Colors.blueGrey,
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => ChapterListView(
+                            idLibro: widget.book.idLibro,
+                            idPerfil:
+                                widget.idPerfil, // 🔹 PASAMOS el idPerfil aquí
+                          ),
                         ),
                       );
                     },

@@ -1,18 +1,20 @@
-// leotest-backend/src/controllers/ia.controller.js
-
 import pool from "../db/connection.js";
-import fetch from 'node-fetch'; 
+import fetch from 'node-fetch';
 
-// URL del Microservicio de IA (Python/FastAPI). Asegúrate de que este puerto sea 8000.
-const IA_WORKER_URL = process.env.IA_WORKER_URL || 'http://localhost:8000/api/ia/worker_process'; 
+// URL del Microservicio de IA (Python/FastAPI).
+const IA_WORKER_URL = process.env.IA_WORKER_URL || 'http://localhost:8000/api/ia/worker_process';
 
 // Función auxiliar para guardar las preguntas en PostgreSQL
 async function _saveQuestionsToDB(idLibro, questions, client) {
     const savedQuestions = [];
-    
-    // NOTA: Asumiremos que el worker ya insertó el capítulo en la BD.
 
     for (const q of questions) {
+        // Validaciones mínimas
+        if (!q || !q.id_capitulo || !q.nivel_comprension || !q.enunciado || !q.opciones) {
+            console.error("Pregunta inválida recibida, saltando:", q);
+            continue;
+        }
+
         // 1. Insertar en tabla 'pregunta'
         const preguntaQuery = `
             INSERT INTO pregunta (id_capitulo, nivel_comprension, enunciado)
@@ -20,7 +22,7 @@ async function _saveQuestionsToDB(idLibro, questions, client) {
             RETURNING id_pregunta;
         `;
         const preguntaResult = await client.query(preguntaQuery, [
-            q.id_capitulo, // Ya debe existir en la tabla capitulo
+            q.id_capitulo,
             q.nivel_comprension,
             q.enunciado,
         ]);
@@ -28,6 +30,12 @@ async function _saveQuestionsToDB(idLibro, questions, client) {
 
         // 2. Insertar en tabla 'opcion_multiple'
         for (const opt of q.opciones) {
+            // Validación mínima de la opción
+            if (!opt || typeof opt.texto_opcion === 'undefined' || typeof opt.opcion_correcta === 'undefined') {
+                console.warn("Opción inválida para pregunta", idPregunta, opt);
+                continue;
+            }
+
             const opcionQuery = `
                 INSERT INTO opcion_multiple (id_pregunta, texto_opcion, opcion_correcta)
                 VALUES ($1, $2, $3);
@@ -38,7 +46,7 @@ async function _saveQuestionsToDB(idLibro, questions, client) {
                 opt.opcion_correcta,
             ]);
         }
-        
+
         savedQuestions.push({ id_pregunta: idPregunta, enunciado: q.enunciado });
     }
     return savedQuestions;
@@ -79,20 +87,20 @@ export const triggerBookProcessing = async (idLibro, rutaArchivo, totalCapitulos
 // =================================================================
 export const saveGeneratedQuestions = async (req, res) => {
     const { id_libro, preguntas } = req.body;
-    
-    if (!id_libro || !preguntas || preguntas.length === 0) {
+
+    if (!id_libro || !preguntas || !Array.isArray(preguntas) || preguntas.length === 0) {
         return res.status(400).json({ mensaje: "Datos de preguntas incompletos." });
     }
 
     const client = await pool.connect();
-    
+
     try {
         await client.query('BEGIN');
 
         // Persistir las preguntas en PostgreSQL
         const savedQuestions = await _saveQuestionsToDB(id_libro, preguntas, client);
-        
-        await client.query('COMMIT'); 
+
+        await client.query('COMMIT');
 
         res.status(201).json({
             exito: true,

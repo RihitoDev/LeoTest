@@ -1,18 +1,24 @@
+// lib/widgets/custom_search_delegate.dart
+
 import 'package:flutter/material.dart';
 import 'package:leotest/models/book.dart';
 import 'package:leotest/services/book_service.dart';
 import 'package:leotest/views/book_detail_view.dart';
 
 class CustomSearchDelegate extends SearchDelegate<Book?> {
-  // Almacena el ID de la categoría seleccionada para usarlo en la búsqueda
+  // 🔹 AGREGADO: ID del perfil
+  final int idPerfil;
+
+  // Almacena el ID y nombre de la categoría seleccionada
   String? _selectedCategoryId;
-  String?
-  _selectedCategoryName; // Almacena el nombre para mostrarlo en la barra
+  String? _selectedCategoryName;
+
+  // 🔹 Constructor que recibe idPerfil
+  CustomSearchDelegate({required this.idPerfil});
 
   late final Future<List<Category>> _futureCategories =
       BookService.obtenerCategorias();
 
-  // Modificamos el campo de búsqueda para reflejar la categoría seleccionada
   @override
   String get searchFieldLabel {
     if (_selectedCategoryName != null) {
@@ -42,7 +48,6 @@ class CustomSearchDelegate extends SearchDelegate<Book?> {
   @override
   List<Widget>? buildActions(BuildContext context) {
     return [
-      // Botón para limpiar categoría seleccionada
       if (_selectedCategoryId != null)
         IconButton(
           icon: const Icon(Icons.close, color: Colors.blueAccent),
@@ -54,7 +59,6 @@ class CustomSearchDelegate extends SearchDelegate<Book?> {
             showSuggestions(context);
           },
         ),
-      // Botón para limpiar texto de búsqueda (query)
       if (query.isNotEmpty)
         IconButton(
           icon: const Icon(Icons.clear, color: Colors.white70),
@@ -76,7 +80,6 @@ class CustomSearchDelegate extends SearchDelegate<Book?> {
 
   @override
   Widget buildResults(BuildContext context) {
-    // Lógica de búsqueda: Prioriza el filtro de categoría si no hay texto nuevo
     String? titleQuery = query.isNotEmpty ? query : null;
     String? categoryIdQuery = _selectedCategoryId;
 
@@ -156,7 +159,10 @@ class CustomSearchDelegate extends SearchDelegate<Book?> {
                     Navigator.push(
                       context,
                       MaterialPageRoute(
-                        builder: (_) => BookDetailView(book: book),
+                        builder: (context) => BookDetailView(
+                          book: book,
+                          idPerfil: idPerfil, // ✅ CORRECTO
+                        ),
                       ),
                     );
                   },
@@ -180,7 +186,6 @@ class CustomSearchDelegate extends SearchDelegate<Book?> {
   Widget buildSuggestions(BuildContext context) {
     final backgroundColor = const Color.fromARGB(255, 3, 0, 12);
 
-    // Si ya hay un filtro seleccionado o texto escrito, solo muestra el botón de búsqueda
     if (_selectedCategoryId != null || query.isNotEmpty) {
       return Container(
         color: backgroundColor,
@@ -193,9 +198,6 @@ class CustomSearchDelegate extends SearchDelegate<Book?> {
       );
     }
 
-    // ----------------------------------------------------
-    // Implementación del Filtro Desplegable (ExpansionTile)
-    // ----------------------------------------------------
     return FutureBuilder<List<Category>>(
       future: _futureCategories,
       builder: (context, snapshot) {
@@ -215,7 +217,6 @@ class CustomSearchDelegate extends SearchDelegate<Book?> {
             child: ListView(
               padding: const EdgeInsets.all(12.0),
               children: [
-                // 1. Título inicial
                 const Padding(
                   padding: EdgeInsets.only(bottom: 15.0),
                   child: Text(
@@ -227,8 +228,6 @@ class CustomSearchDelegate extends SearchDelegate<Book?> {
                     ),
                   ),
                 ),
-
-                // 2. ExpansionTile: El filtro desplegable
                 Theme(
                   data: Theme.of(
                     context,
@@ -257,8 +256,6 @@ class CustomSearchDelegate extends SearchDelegate<Book?> {
                       Icons.filter_list,
                       color: Colors.blueAccent,
                     ),
-
-                    // 3. Contenido del Desplegable: La lista de categorías
                     children: categories.map((category) {
                       return ListTile(
                         contentPadding: const EdgeInsets.symmetric(
@@ -276,11 +273,9 @@ class CustomSearchDelegate extends SearchDelegate<Book?> {
                           style: const TextStyle(color: Colors.white),
                         ),
                         onTap: () {
-                          // 1. Guarda el ID y el Nombre para el filtro
                           _selectedCategoryId = category.id.toString();
                           _selectedCategoryName = category.name;
                           query = '';
-                          // 2. Cierra la lista de sugerencias y ejecuta la búsqueda
                           showResults(context);
                         },
                       );

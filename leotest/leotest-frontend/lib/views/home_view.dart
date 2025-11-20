@@ -6,11 +6,12 @@ import 'package:leotest/widgets/book_list_widget.dart';
 import 'package:leotest/models/book.dart';
 import 'package:leotest/services/book_service.dart';
 import 'package:leotest/services/stats_service.dart';
-import 'package:leotest/services/notification_service.dart'; 
+import 'package:leotest/services/notification_service.dart';
 import 'package:leotest/models/notification.dart'; // Importado
 
 class HomeView extends StatefulWidget {
-  const HomeView({super.key});
+  final int? profileId;
+  const HomeView({super.key, this.profileId});
 
   @override
   State<HomeView> createState() => _HomeViewState();
@@ -19,7 +20,7 @@ class HomeView extends StatefulWidget {
 class _HomeViewState extends State<HomeView> {
   late final Future<List<Category>> _futureCategories =
       BookService.obtenerCategorias();
-      
+
   // Futures para datos dinámicos
   late Future<int> _futureBooksRead;
   late Future<int> _futureCurrentStreak;
@@ -30,20 +31,25 @@ class _HomeViewState extends State<HomeView> {
     super.initState();
     _loadStatsAndNotifications();
   }
-  
+
   // Función para carga/recarga de estadísticas y notificaciones
   void _loadStatsAndNotifications() {
-     if (mounted) {
-        setState(() {
-          _futureBooksRead = StatsService.fetchGeneralStats().then((stats) => stats.librosLeidos ?? 0);
-          _futureCurrentStreak = StatsService.fetchCurrentStreak();
-          _futureNotifications = NotificationService.fetchNotifications();
-        });
-     }
+    if (mounted) {
+      setState(() {
+        _futureBooksRead = StatsService.fetchGeneralStats().then(
+          (stats) => stats.librosLeidos ?? 0,
+        );
+        _futureCurrentStreak = StatsService.fetchCurrentStreak();
+        _futureNotifications = NotificationService.fetchNotifications();
+      });
+    }
   }
 
   // Widget para el Panel de Notificaciones (HU-1.3)
-  void _showNotificationPanel(BuildContext context, List<AppNotification> notifications) {
+  void _showNotificationPanel(
+    BuildContext context,
+    List<AppNotification> notifications,
+  ) {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -62,7 +68,10 @@ class _HomeViewState extends State<HomeView> {
                     padding: const EdgeInsets.all(16.0),
                     child: Text(
                       'Alertas y Notificaciones',
-                      style: Theme.of(context).textTheme.titleLarge?.copyWith(color: Colors.white, fontWeight: FontWeight.bold),
+                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                   ),
                   Expanded(
@@ -74,15 +83,41 @@ class _HomeViewState extends State<HomeView> {
                         final isUnread = notification.estado != 'leída';
                         return ListTile(
                           leading: Icon(
-                            notification.tipo == 'mision' ? Icons.check_circle_outline : Icons.notifications_none,
-                            color: isUnread ? Theme.of(context).colorScheme.primary : Colors.grey,
+                            notification.tipo == 'mision'
+                                ? Icons.check_circle_outline
+                                : Icons.notifications_none,
+                            color: isUnread
+                                ? Theme.of(context).colorScheme.primary
+                                : Colors.grey,
                           ),
-                          title: Text(notification.mensaje, style: TextStyle(color: isUnread ? Colors.white : Colors.white70, fontWeight: isUnread ? FontWeight.bold : FontWeight.normal)),
-                          subtitle: Text('Tipo: ${notification.tipo} - ${notification.fecha}', style: const TextStyle(color: Colors.grey, fontSize: 12)),
-                          trailing: isUnread ? const Icon(Icons.circle, size: 10, color: Colors.redAccent) : null,
+                          title: Text(
+                            notification.mensaje,
+                            style: TextStyle(
+                              color: isUnread ? Colors.white : Colors.white70,
+                              fontWeight: isUnread
+                                  ? FontWeight.bold
+                                  : FontWeight.normal,
+                            ),
+                          ),
+                          subtitle: Text(
+                            'Tipo: ${notification.tipo} - ${notification.fecha}',
+                            style: const TextStyle(
+                              color: Colors.grey,
+                              fontSize: 12,
+                            ),
+                          ),
+                          trailing: isUnread
+                              ? const Icon(
+                                  Icons.circle,
+                                  size: 10,
+                                  color: Colors.redAccent,
+                                )
+                              : null,
                           onTap: () async {
                             if (isUnread) {
-                              await NotificationService.markAsRead(notification.id);
+                              await NotificationService.markAsRead(
+                                notification.id,
+                              );
                               _loadStatsAndNotifications(); // Recarga para actualizar el conteo
                               Navigator.pop(modalContext); // Cierra el modal
                             }
@@ -119,13 +154,19 @@ class _HomeViewState extends State<HomeView> {
             future: _futureNotifications,
             builder: (context, snapshot) {
               final notifications = snapshot.data ?? [];
-              final unreadCount = notifications.where((n) => n.estado != 'leída').length;
+              final unreadCount = notifications
+                  .where((n) => n.estado != 'leída')
+                  .length;
 
               return IconButton(
                 icon: Stack(
                   alignment: Alignment.topRight,
                   children: [
-                    const Icon(Icons.notifications_outlined, color: Colors.white70, size: 28),
+                    const Icon(
+                      Icons.notifications_outlined,
+                      color: Colors.white70,
+                      size: 28,
+                    ),
                     if (unreadCount > 0)
                       Container(
                         padding: const EdgeInsets.all(3),
@@ -133,8 +174,18 @@ class _HomeViewState extends State<HomeView> {
                           color: Colors.red,
                           borderRadius: BorderRadius.circular(9),
                         ),
-                        constraints: const BoxConstraints(minWidth: 18, minHeight: 18),
-                        child: Text('$unreadCount', style: const TextStyle(color: Colors.white, fontSize: 10), textAlign: TextAlign.center),
+                        constraints: const BoxConstraints(
+                          minWidth: 18,
+                          minHeight: 18,
+                        ),
+                        child: Text(
+                          '$unreadCount',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 10,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
                       ),
                   ],
                 ),
@@ -142,7 +193,7 @@ class _HomeViewState extends State<HomeView> {
               );
             },
           ),
-          
+
           // Integración: Libros Leídos
           FutureBuilder<int>(
             future: _futureBooksRead,
@@ -165,7 +216,7 @@ class _HomeViewState extends State<HomeView> {
               );
             },
           ),
-          
+
           // Integración: Racha
           FutureBuilder<int>(
             future: _futureCurrentStreak,
@@ -175,7 +226,10 @@ class _HomeViewState extends State<HomeView> {
                 padding: const EdgeInsets.symmetric(horizontal: 12.0),
                 child: Row(
                   children: [
-                    const Icon(Icons.local_fire_department, color: Colors.orange),
+                    const Icon(
+                      Icons.local_fire_department,
+                      color: Colors.orange,
+                    ),
                     Text(
                       '$currentStreak',
                       style: const TextStyle(
@@ -188,12 +242,15 @@ class _HomeViewState extends State<HomeView> {
               );
             },
           ),
-          
+
           IconButton(
             tooltip: 'Buscar libros',
             icon: const Icon(Icons.search, color: Colors.white70),
             onPressed: () {
-              showSearch(context: context, delegate: CustomSearchDelegate());
+              showSearch(
+                context: context,
+                delegate: CustomSearchDelegate(idPerfil: widget.profileId ?? 0),
+              );
             },
           ),
         ],
@@ -232,7 +289,7 @@ class _HomeViewState extends State<HomeView> {
                       ),
                     );
                   }
-                  
+
                   if (snapshot.hasData && snapshot.data!.isNotEmpty) {
                     final categories = snapshot.data!;
                     return Column(
@@ -266,7 +323,6 @@ class _HomeViewState extends State<HomeView> {
   Future<List<Book>> _fetchBooks(int categoryId) async {
     return BookService.buscarLibros(categoriaId: categoryId.toString());
   }
-
 
   /// Construye un carrusel por categoría
   Widget _buildCategoryCarousel(Category category) {
@@ -303,8 +359,9 @@ class _HomeViewState extends State<HomeView> {
 
         if (snapshot.hasData && snapshot.data!.isNotEmpty) {
           return BookListWidget(
-            category: category, 
-            books: snapshot.data!
+            category: category,
+            books: snapshot.data!,
+            idPerfil: widget.profileId ?? 0, // o el valor por defecto que uses
           );
         }
 
@@ -339,7 +396,7 @@ class _HomeViewState extends State<HomeView> {
             ),
           );
         }
-        
+
         if (snapshot.hasError) {
           return Padding(
             padding: const EdgeInsets.only(left: 16.0, bottom: 20.0),
