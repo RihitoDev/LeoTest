@@ -1,3 +1,4 @@
+// favorito_service.dart
 import 'dart:convert';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:http/http.dart' as http;
@@ -27,7 +28,7 @@ class FavoritoService {
       body: json.encode({'id_perfil': idPerfil, 'id_libro': idLibro}),
     );
 
-    if (response.statusCode != 200) {
+    if (response.statusCode != 200 && response.statusCode != 201) {
       throw Exception('Error al agregar favorito');
     }
   }
@@ -37,13 +38,16 @@ class FavoritoService {
     required int idPerfil,
     required int idLibro,
   }) async {
-    final response = await http.delete(
-      Uri.parse(_baseUrl),
-      headers: {'Content-Type': 'application/json'},
-      body: json.encode({'id_perfil': idPerfil, 'id_libro': idLibro}),
-    );
+    // Nota: algunos servidores no aceptan body en DELETE; si el tuyo no lo acepta,
+    // puedes cambiar a enviar por query params o usar POST a /delete.
+    final request = http.Request('DELETE', Uri.parse(_baseUrl));
+    request.headers['Content-Type'] = 'application/json';
+    request.body = json.encode({'id_perfil': idPerfil, 'id_libro': idLibro});
 
-    if (response.statusCode != 200) {
+    final streamed = await request.send();
+    final response = await http.Response.fromStream(streamed);
+
+    if (response.statusCode != 200 && response.statusCode != 204) {
       throw Exception('Error al eliminar favorito');
     }
   }

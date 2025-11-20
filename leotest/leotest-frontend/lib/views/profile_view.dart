@@ -1,15 +1,14 @@
 // lib/views/profile_view.dart
-
 import 'package:flutter/material.dart';
 import 'package:leotest/views/settings_view.dart';
 import 'package:leotest/views/progress_view.dart';
 import 'package:leotest/views/login_view.dart';
 import 'package:leotest/services/auth_service.dart';
 import 'package:leotest/services/profile_service.dart';
-import 'package:leotest/services/stats_service.dart'; // Mantener si se usa GeneralStats en el servicio
 
 class ProfileView extends StatefulWidget {
-  const ProfileView({super.key});
+  final int? profileId;
+  const ProfileView({super.key, this.profileId});
 
   @override
   State<ProfileView> createState() => _ProfileViewState();
@@ -17,7 +16,7 @@ class ProfileView extends StatefulWidget {
 
 class _ProfileViewState extends State<ProfileView> {
   late Future<UserProfileData> _futureProfileData;
-  
+
   @override
   void initState() {
     super.initState();
@@ -34,9 +33,11 @@ class _ProfileViewState extends State<ProfileView> {
 
   // --- WIDGETS AUXILIARES ---
 
-  // Muestra el avatar y las estadísticas rápidas (HU-11.2, HU-3.1)
-  Widget _buildAvatarSection(BuildContext context, Color primaryColor, UserProfileData profile) {
-    
+  Widget _buildAvatarSection(
+    BuildContext context,
+    Color primaryColor,
+    UserProfileData profile,
+  ) {
     return Column(
       children: [
         Container(
@@ -46,31 +47,37 @@ class _ProfileViewState extends State<ProfileView> {
             color: primaryColor,
             shape: BoxShape.circle,
           ),
-          child: const Icon(Icons.person, size: 60, color: Colors.black),
+          child: profile.imagenPerfil == null
+              ? const Icon(Icons.person, size: 60, color: Colors.black)
+              : ClipOval(
+                  child: Image.network(
+                    profile.imagenPerfil!,
+                    fit: BoxFit.cover,
+                    width: 100,
+                    height: 100,
+                  ),
+                ),
         ),
         const SizedBox(height: 10),
-        // Datos Reales: Nombre de Perfil
         Text(
-          profile.nombrePerfil, 
-          style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.white)
+          profile.nombrePerfil,
+          style: const TextStyle(
+            fontSize: 24,
+            fontWeight: FontWeight.bold,
+            color: Colors.white,
+          ),
         ),
         const SizedBox(height: 5),
-        // Datos Reales: Email
         Text(
-          profile.email, 
-          style: const TextStyle(fontSize: 14, color: Colors.grey)
+          profile.email,
+          style: const TextStyle(fontSize: 14, color: Colors.grey),
         ),
-
-        // Estadísticas Reales (CORREGIDO: Acceso directo a las propiedades)
         const SizedBox(height: 15),
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceEvenly,
           children: [
-            // ✅ CORREGIDO: Usar profile.librosLeidos
             _buildStatItem('Libros Leídos', profile.librosLeidos.toString()),
-            // ✅ CORREGIDO: Usar profile.rachaDias
             _buildStatItem('Racha', '${profile.rachaDias} días'),
-            // Datos del Perfil: Nivel
             _buildStatItem('Nivel', profile.nivelEducativo),
           ],
         ),
@@ -78,25 +85,31 @@ class _ProfileViewState extends State<ProfileView> {
     );
   }
 
-  // Muestra un ítem individual de estadística
   Widget _buildStatItem(String label, String value) {
     return Column(
       children: [
-        Text(value, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white)),
+        Text(
+          value,
+          style: const TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.bold,
+            color: Colors.white,
+          ),
+        ),
         Text(label, style: const TextStyle(fontSize: 12, color: Colors.grey)),
       ],
     );
   }
 
-  // Construye las opciones de navegación o acción
   Widget _buildProfileOption(
-    BuildContext context, 
-    String title, 
-    IconData icon, 
-    Color cardColor, 
-    Color primaryColor,
-    {bool isLogout = false, VoidCallback? onTapAction}
-  ) {
+    BuildContext context,
+    String title,
+    IconData icon,
+    Color cardColor,
+    Color primaryColor, {
+    bool isLogout = false,
+    VoidCallback? onTapAction,
+  }) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8.0),
       child: Container(
@@ -104,43 +117,56 @@ class _ProfileViewState extends State<ProfileView> {
           color: cardColor,
           borderRadius: BorderRadius.circular(10),
           boxShadow: [
-              BoxShadow(
-              color: Colors.black.withOpacity(0.4), 
+            BoxShadow(
+              color: Colors.black.withOpacity(0.4),
               blurRadius: 5,
-              offset: const Offset(0, 3)
-            )
-          ]
+              offset: const Offset(0, 3),
+            ),
+          ],
         ),
         child: ListTile(
-          leading: Icon(icon, color: isLogout ? Colors.redAccent : primaryColor),
-          title: Text(
-            title, 
-            style: TextStyle(
-              fontWeight: FontWeight.w600, 
-              color: isLogout ? Colors.redAccent : Colors.white
-            )
+          leading: Icon(
+            icon,
+            color: isLogout ? Colors.redAccent : primaryColor,
           ),
-          trailing: isLogout ? null : const Icon(Icons.arrow_forward_ios, size: 16, color: Color(0xFFAAAAAA)),
-          onTap: onTapAction ?? () {
-            if (isLogout) {
-              AuthService.logout(); 
-              Navigator.pushAndRemoveUntil(
-                context,
-                MaterialPageRoute(builder: (context) => const LoginView()),
-                (Route<dynamic> route) => false,
-              );
-            } else if (title == 'Editar Datos y Preferencias') {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (context) => const SettingsView()),
-              ).then((_) => _loadProfileData()); 
-            } else if (title == 'Progreso') {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (context) => const ProgressView()),
-              );
-            }
-          },
+          title: Text(
+            title,
+            style: TextStyle(
+              fontWeight: FontWeight.w600,
+              color: isLogout ? Colors.redAccent : Colors.white,
+            ),
+          ),
+          trailing: isLogout
+              ? null
+              : const Icon(
+                  Icons.arrow_forward_ios,
+                  size: 16,
+                  color: Color(0xFFAAAAAA),
+                ),
+          onTap:
+              onTapAction ??
+              () {
+                if (isLogout) {
+                  AuthService.logout();
+                  Navigator.pushAndRemoveUntil(
+                    context,
+                    MaterialPageRoute(builder: (context) => const LoginView()),
+                    (Route<dynamic> route) => false,
+                  );
+                } else if (title == 'Editar Datos y Preferencias') {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (context) => SettingsView()),
+                  ).then((_) => _loadProfileData());
+                } else if (title == 'Progreso') {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const ProgressView(),
+                    ),
+                  );
+                }
+              },
         ),
       ),
     );
@@ -149,7 +175,7 @@ class _ProfileViewState extends State<ProfileView> {
   @override
   Widget build(BuildContext context) {
     final primaryColor = Theme.of(context).colorScheme.primary;
-    final cardColor = Theme.of(context).colorScheme.surface; 
+    final cardColor = Theme.of(context).colorScheme.surface;
 
     return Scaffold(
       appBar: AppBar(
@@ -162,27 +188,32 @@ class _ProfileViewState extends State<ProfileView> {
         future: _futureProfileData,
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
-            return Center(child: CircularProgressIndicator(color: primaryColor));
+            return Center(
+              child: CircularProgressIndicator(color: primaryColor),
+            );
           }
-          
+
           if (snapshot.hasError) {
-             // Muestra error y permite recargar (HU-11.2)
-             return Center(
-                child: Padding(
-                  padding: const EdgeInsets.all(30.0),
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                       Text(
-                         'Error al cargar perfil. Asegúrate de que el backend esté activo.',
-                         textAlign: TextAlign.center,
-                         style: const TextStyle(color: Colors.red),
-                       ),
-                       const SizedBox(height: 20),
-                       ElevatedButton(onPressed: _loadProfileData, child: const Text('Recargar Perfil'))
-                    ],
-                  ),
-                ));
+            return Center(
+              child: Padding(
+                padding: const EdgeInsets.all(30.0),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(
+                      'Error al cargar perfil. Asegúrate de que el backend esté activo.',
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(color: Colors.red),
+                    ),
+                    const SizedBox(height: 20),
+                    ElevatedButton(
+                      onPressed: _loadProfileData,
+                      child: const Text('Recargar Perfil'),
+                    ),
+                  ],
+                ),
+              ),
+            );
           }
 
           final profile = snapshot.data!;
@@ -192,37 +223,70 @@ class _ProfileViewState extends State<ProfileView> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.center,
               children: [
-                // 1. Sección de Avatar y Estadísticas Reales
                 _buildAvatarSection(context, primaryColor, profile),
-                
                 const SizedBox(height: 30),
-                
-                // 2. Opciones de Perfil/Navegación
-                _buildProfileOption(context, 'Progreso', Icons.timeline, cardColor, primaryColor), 
-                _buildProfileOption(context, 'Evaluaciones', Icons.checklist, cardColor, primaryColor), 
-                _buildProfileOption(context, 'Estadísticas', Icons.bar_chart, cardColor, primaryColor), 
-                _buildProfileOption(context, 'Social', Icons.people_outline, cardColor, primaryColor), 
-                
+                _buildProfileOption(
+                  context,
+                  'Progreso',
+                  Icons.timeline,
+                  cardColor,
+                  primaryColor,
+                ),
+                _buildProfileOption(
+                  context,
+                  'Evaluaciones',
+                  Icons.checklist,
+                  cardColor,
+                  primaryColor,
+                ),
+                _buildProfileOption(
+                  context,
+                  'Estadísticas',
+                  Icons.bar_chart,
+                  cardColor,
+                  primaryColor,
+                ),
+                _buildProfileOption(
+                  context,
+                  'Social',
+                  Icons.people_outline,
+                  cardColor,
+                  primaryColor,
+                ),
                 const SizedBox(height: 30),
-
-                // 3. Sección de Configuración (HU-11.3)
                 Align(
                   alignment: Alignment.centerLeft,
                   child: Text(
                     'Configuración',
                     style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                      color: Colors.white70, 
-                      fontWeight: FontWeight.bold
+                      color: Colors.white70,
+                      fontWeight: FontWeight.bold,
                     ),
                   ),
                 ),
                 const SizedBox(height: 10),
-                
-                _buildProfileOption(context, 'Editar Datos y Preferencias', Icons.settings, cardColor, primaryColor),
-                _buildProfileOption(context, 'Privacidad', Icons.lock_outline, cardColor, primaryColor),
-                
-                // 4. Opción de Cerrar Sesión
-                _buildProfileOption(context, 'Cerrar Sesión', Icons.logout, cardColor, primaryColor, isLogout: true),
+                _buildProfileOption(
+                  context,
+                  'Editar Datos y Preferencias',
+                  Icons.settings,
+                  cardColor,
+                  primaryColor,
+                ),
+                _buildProfileOption(
+                  context,
+                  'Privacidad',
+                  Icons.lock_outline,
+                  cardColor,
+                  primaryColor,
+                ),
+                _buildProfileOption(
+                  context,
+                  'Cerrar Sesión',
+                  Icons.logout,
+                  cardColor,
+                  primaryColor,
+                  isLogout: true,
+                ),
               ],
             ),
           );

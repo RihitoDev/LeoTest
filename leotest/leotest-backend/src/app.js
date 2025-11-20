@@ -16,7 +16,7 @@ import profileRoutes from './routes/profile.routes.js';      // ✅ Importado
 
 // Asumimos que también tenemos la ruta de IA (ya que es parte de tu arquitectura)
 import iaRoutes from './routes/ia.routes.js';              // ✅ Importado
-
+import evaluationRoutes from "./routes/evaluation.routes.js";
 
 // 3. Configurar dotenv
 dotenv.config();
@@ -44,7 +44,7 @@ app.use('/api/profile', profileRoutes);
 
 // Ruta de IA (Para futura integración/controlador de libros)
 app.use('/api/ia', iaRoutes); 
-
+app.use("/api/evaluacion", evaluationRoutes);
 
 // 7. INICIO DEL SERVIDOR
 app.listen(PORT, '0.0.0.0', () => {

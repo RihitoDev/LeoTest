@@ -1,24 +1,22 @@
 // lib/services/profile_service.dart
-
 import 'dart:convert';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:http/http.dart' as http;
 import 'auth_service.dart';
-import 'stats_service.dart';
 
 class UserProfileData {
-  final String nombreUsuario; // Nombre de usuario (login)
-  final String nombrePerfil; // Nombre completo o display name
-  final String email; // No se obtiene del perfil/usuario, es estático para esta simulación
+  final int? idPerfil;
+  final String nombreUsuario;
+  final String nombrePerfil;
+  final String email;
   final int edad;
   final String nivelEducativo;
-  
-  // Estadísticas que vienen del JOIN
   final int rachaDias;
   final int librosLeidos;
   final double? porcentajeAciertos;
-
+  final String? imagenPerfil; // URL
   UserProfileData({
+    this.idPerfil,
     required this.nombreUsuario,
     required this.nombrePerfil,
     required this.email,
@@ -27,67 +25,134 @@ class UserProfileData {
     required this.rachaDias,
     required this.librosLeidos,
     this.porcentajeAciertos,
+    this.imagenPerfil,
   });
+}
+
+class NivelEducativo {
+  final int id;
+  final String nombre;
+  NivelEducativo({required this.id, required this.nombre});
 }
 
 class ProfileService {
   static String get _baseUrl => "${dotenv.env['API_BASE']}/api/profile";
   static String get _currentUserId => AuthService.getCurrentUserId();
-  
-  // Asumimos que el email es estático o se maneja por separado ya que no está en la BD
   static const String SIMULATED_EMAIL = "usuario@leotest.com";
 
-  /// Obtiene todos los datos del perfil y sus estadísticas (HU-11.2)
-  static Future<UserProfileData> fetchProfileData() async {
-    final userId = _currentUserId;
-
+  /// Obtiene perfil por idUsuario (para saber si existe y traer id_perfil)
+  static Future<UserProfileData?> fetchProfileForUser(String userId) async {
     try {
-      final response = await http.get(Uri.parse('$_baseUrl/$userId'));
-
+      final response = await http.get(Uri.parse("$_baseUrl/user/$userId"));
       if (response.statusCode == 200) {
-        final data = json.decode(response.body);
-        final profile = data['datos_perfil'];
-
-        // Manejamos la conversión de números decimales que pueden venir como String o num
-        final double? aciertos = (profile['porcentaje_aciertos'] is String)
-            ? double.tryParse(profile['porcentaje_aciertos'])
-            : (profile['porcentaje_aciertos'] as num?)?.toDouble();
-        
-        final int libros = (profile['libros_leidos'] as int?) ?? 0;
-
-        return UserProfileData(
-            nombreUsuario: profile['nombre_usuario'] as String,
-            nombrePerfil: profile['nombre_perfil'] as String,
-            email: SIMULATED_EMAIL, // Usamos el estático/simulado
-            edad: profile['edad'] as int,
-            nivelEducativo: profile['nivel_educativo'] as String,
-            rachaDias: profile['racha_dias'] as int,
-            librosLeidos: libros,
-            porcentajeAciertos: aciertos,
-        );
+        final body = json.decode(response.body);
+        if (body['existe'] == true) {
+          final p = body['perfil'];
+          double? porcentaje = (p['porcentaje_aciertos'] is String)
+              ? double.tryParse(p['porcentaje_aciertos'])
+              : (p['porcentaje_aciertos'] as num?)?.toDouble();
+          return UserProfileData(
+            idPerfil: p['id_perfil'] as int?,
+            nombreUsuario:
+                p['nombre_perfil'] ?? p['nombre_usuario'] ?? "Usuario",
+            nombrePerfil: p['nombre_perfil'] ?? "Usuario",
+            email: SIMULATED_EMAIL,
+            edad: p['edad'] ?? 0,
+            nivelEducativo: p['nombre_nivel_educativo'] ?? "",
+            rachaDias: p['racha_dias'] ?? 0,
+            librosLeidos: p['libros_leidos'] ?? 0,
+            porcentajeAciertos: porcentaje,
+            imagenPerfil: p['imagen_perfil'],
+          );
+        } else {
+          return null;
+        }
+      } else if (response.statusCode == 204) {
+        return null;
+      } else {
+        print("ProfileService.fetchProfileForUser HTTP ${response.statusCode}");
+        return null;
       }
-      
-      print('Error al obtener datos de perfil: HTTP ${response.statusCode}');
-      // Devuelve datos base si falla la conexión o el servidor
-      return _getFallbackProfile();
-
     } catch (e) {
-      print('Error de conexión en ProfileService: $e');
-      return _getFallbackProfile();
+      print("ProfileService.fetchProfileForUser error: $e");
+      return null;
     }
   }
-  
-  // Retorna datos mínimos en caso de fallo
-  static UserProfileData _getFallbackProfile() {
-      return UserProfileData(
-          nombreUsuario: "Invitado",
-          nombrePerfil: "Usuario Desconocido",
-          email: "error@leotest.com",
-          edad: 0,
-          nivelEducativo: "Básico",
-          rachaDias: 0,
-          librosLeidos: 0,
-          porcentajeAciertos: 0.0
+
+  /// Crea perfil (retorna id_perfil si ok)
+  static Future<int?> createProfile({
+    required int idUsuario,
+    required String nombrePerfil,
+    int? edad,
+    int? idNivelEducativo,
+    String? imagenPerfilUrl,
+  }) async {
+    final body = {
+      "id_usuario": idUsuario,
+      "nombre_perfil": nombrePerfil,
+      "edad": edad,
+      "id_nivel_educativo": idNivelEducativo,
+      "imagen_perfil": imagenPerfilUrl,
+    };
+    try {
+      final response = await http.post(
+        Uri.parse("$_baseUrl"),
+        headers: {"Content-Type": "application/json"},
+        body: json.encode(body),
       );
+      if (response.statusCode == 201) {
+        final data = json.decode(response.body);
+        return data['id_perfil'] as int?;
+      } else {
+        print("createProfile failed: ${response.statusCode} ${response.body}");
+        return null;
+      }
+    } catch (e) {
+      print("createProfile error: $e");
+      return null;
+    }
+  }
+
+  /// Obtiene niveles educativos (para dropdown/checkbox)
+  static Future<List<NivelEducativo>> fetchNivelesEducativos() async {
+    try {
+      final response = await http.get(Uri.parse("$_baseUrl/niveles"));
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        final list = (data['niveles'] as List)
+            .map(
+              (e) => NivelEducativo(
+                id: e['id_nivel_educativo'],
+                nombre: e['nombre_nivel_educativo'],
+              ),
+            )
+            .toList();
+        return list;
+      } else {
+        return [];
+      }
+    } catch (e) {
+      print("fetchNivelesEducativos error: $e");
+      return [];
+    }
+  }
+
+  /// Fallback para mantener compatibilidad con métodos antiguos si los necesitas
+  static Future<UserProfileData> fetchProfileData() async {
+    final userId = _currentUserId;
+    final profile = await fetchProfileForUser(userId);
+    if (profile != null) return profile;
+    return UserProfileData(
+      idPerfil: null,
+      nombreUsuario: "Invitado",
+      nombrePerfil: "Usuario Desconocido",
+      email: "error@leotest.com",
+      edad: 0,
+      nivelEducativo: "Básico",
+      rachaDias: 0,
+      librosLeidos: 0,
+      porcentajeAciertos: 0.0,
+      imagenPerfil: null,
+    );
   }
 }
