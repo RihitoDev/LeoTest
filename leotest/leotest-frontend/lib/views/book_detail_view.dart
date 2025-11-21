@@ -1,4 +1,3 @@
-// book_detail_view.dart
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:leotest/models/book.dart';
@@ -11,11 +10,7 @@ class BookDetailView extends StatefulWidget {
   final Book book;
   final int idPerfil; // 🔹 NUEVO PARÁMETRO
 
-  const BookDetailView({
-    super.key,
-    required this.book,
-    required this.idPerfil, // 🔹 requerido
-  });
+  const BookDetailView({super.key, required this.book, required this.idPerfil});
 
   @override
   State<BookDetailView> createState() => _BookDetailViewState();
@@ -30,7 +25,6 @@ class _BookDetailViewState extends State<BookDetailView> {
   void initState() {
     super.initState();
 
-    // Cargar después del primer frame
     SchedulerBinding.instance.addPostFrameCallback((_) {
       _fetchBookProgress();
       _cargarFavorito();
@@ -40,7 +34,7 @@ class _BookDetailViewState extends State<BookDetailView> {
   Future<void> _cargarFavorito() async {
     try {
       final favoritos = await FavoritoService.obtenerFavoritos(
-        idPerfil: widget.idPerfil, // 🔹 usar widget.idPerfil
+        idPerfil: widget.idPerfil,
       );
       if (mounted) {
         setState(() => _isFavorito = favoritos.contains(widget.book.idLibro));
@@ -53,25 +47,23 @@ class _BookDetailViewState extends State<BookDetailView> {
   Future<void> _toggleFavorito() async {
     try {
       if (_isFavorito) {
-        // Quitar favorito
         await FavoritoService.quitarFavorito(
-          idPerfil: widget.idPerfil, // 🔹 usar widget.idPerfil
+          idPerfil: widget.idPerfil,
           idLibro: widget.book.idLibro,
         );
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Libro eliminado de favoritos.')),
         );
       } else {
-        // Agregar favorito
         await FavoritoService.agregarFavorito(
-          idPerfil: widget.idPerfil, // 🔹 usar widget.idPerfil
+          idPerfil: widget.idPerfil,
           idLibro: widget.book.idLibro,
         );
 
         // Si no existe en MyBooks, agregar automáticamente
         if (_bookProgress == null) {
           try {
-            await MyBooksService.addBookToLibrary(widget.book);
+            await MyBooksService.addBookToLibrary(widget.book, widget.idPerfil);
             await _fetchBookProgress();
           } catch (e) {
             print('Error al agregar libro a MyBooks desde BookDetail: $e');
@@ -98,6 +90,7 @@ class _BookDetailViewState extends State<BookDetailView> {
     try {
       final progress = await MyBooksService.getBookProgress(
         widget.book.titulo ?? "Título desconocido",
+        widget.idPerfil, // 🔹 idPerfil obligatorio
       );
       if (mounted) {
         setState(() {
@@ -113,10 +106,8 @@ class _BookDetailViewState extends State<BookDetailView> {
 
   void _startReading() async {
     if (_bookProgress == null) {
-      await MyBooksService.addBookToLibrary(widget.book);
-      await _fetchBookProgress();
+      await MyBooksService.addBookToLibrary(widget.book, widget.idPerfil);
     }
-
     final initialPage = _bookProgress?.currentPage ?? 0;
 
     Navigator.push(
@@ -128,7 +119,7 @@ class _BookDetailViewState extends State<BookDetailView> {
           idPerfil: widget.idPerfil,
         ),
       ),
-    ).then((_) => _fetchBookProgress());
+    ).then((_) => _fetchBookProgress()); // 🔹 refresca al volver
   }
 
   Widget _buildCover(String? portada) {
@@ -262,7 +253,6 @@ class _BookDetailViewState extends State<BookDetailView> {
                 borderRadius: BorderRadius.circular(4),
               ),
               const SizedBox(height: 20),
-              // ❤️ Ícono de favorito debajo del progreso
               Align(
                 alignment: Alignment.centerRight,
                 child: IconButton(

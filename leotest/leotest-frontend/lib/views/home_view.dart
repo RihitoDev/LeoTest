@@ -24,15 +24,18 @@ class _HomeViewState extends State<HomeView> {
   // Futures para datos dinámicos
   late Future<int> _futureBooksRead;
   late Future<int> _futureCurrentStreak;
-  late Future<List<AppNotification>> _futureNotifications; // Nuevo Future
+  late Future<List<AppNotification>> _futureNotifications;
 
   @override
   void initState() {
     super.initState();
+
+    // 🔥 LOG PRINCIPAL: Saber qué ID de perfil llega a esta pantalla
+    debugPrint("🎯 [HomeView] ID de perfil recibido: ${widget.profileId}");
+
     _loadStatsAndNotifications();
   }
 
-  // Función para carga/recarga de estadísticas y notificaciones
   void _loadStatsAndNotifications() {
     if (mounted) {
       setState(() {
@@ -45,7 +48,6 @@ class _HomeViewState extends State<HomeView> {
     }
   }
 
-  // Widget para el Panel de Notificaciones (HU-1.3)
   void _showNotificationPanel(
     BuildContext context,
     List<AppNotification> notifications,
@@ -118,8 +120,8 @@ class _HomeViewState extends State<HomeView> {
                               await NotificationService.markAsRead(
                                 notification.id,
                               );
-                              _loadStatsAndNotifications(); // Recarga para actualizar el conteo
-                              Navigator.pop(modalContext); // Cierra el modal
+                              _loadStatsAndNotifications();
+                              Navigator.pop(modalContext);
                             }
                           },
                         );
@@ -149,7 +151,7 @@ class _HomeViewState extends State<HomeView> {
           style: TextStyle(fontWeight: FontWeight.w900, color: primaryColor),
         ),
         actions: [
-          // Integración: Botón de Notificaciones con Conteo (HU-1.3)
+          // 🔔 NOTIFICACIONES
           FutureBuilder<List<AppNotification>>(
             future: _futureNotifications,
             builder: (context, snapshot) {
@@ -194,7 +196,7 @@ class _HomeViewState extends State<HomeView> {
             },
           ),
 
-          // Integración: Libros Leídos
+          // 📘 LIBROS LEÍDOS
           FutureBuilder<int>(
             future: _futureBooksRead,
             builder: (context, snapshot) {
@@ -217,7 +219,7 @@ class _HomeViewState extends State<HomeView> {
             },
           ),
 
-          // Integración: Racha
+          // 🔥 RACHA
           FutureBuilder<int>(
             future: _futureCurrentStreak,
             builder: (context, snapshot) {
@@ -255,6 +257,7 @@ class _HomeViewState extends State<HomeView> {
           ),
         ],
       ),
+
       body: Container(
         color: backgroundColor,
         child: SingleChildScrollView(
@@ -292,6 +295,11 @@ class _HomeViewState extends State<HomeView> {
 
                   if (snapshot.hasData && snapshot.data!.isNotEmpty) {
                     final categories = snapshot.data!;
+
+                    debugPrint(
+                      "📂 [HomeView] Categorías cargadas: ${categories.length}",
+                    );
+
                     return Column(
                       children: categories.map((category) {
                         return _buildCategoryCarousel(category);
@@ -319,12 +327,11 @@ class _HomeViewState extends State<HomeView> {
     );
   }
 
-  /// Obtener libros por categoría
   Future<List<Book>> _fetchBooks(int categoryId) async {
+    debugPrint("📘 [HomeView] Cargando libros de categoría ID: $categoryId");
     return BookService.buscarLibros(categoriaId: categoryId.toString());
   }
 
-  /// Construye un carrusel por categoría
   Widget _buildCategoryCarousel(Category category) {
     return FutureBuilder<List<Book>>(
       future: _fetchBooks(category.id),
@@ -358,10 +365,16 @@ class _HomeViewState extends State<HomeView> {
         }
 
         if (snapshot.hasData && snapshot.data!.isNotEmpty) {
+          // 🔥 LOG: Aquí se envía el ID al BookListWidget → MyBooks
+          debugPrint(
+            "📚 [HomeView] Enviando idPerfil=${widget.profileId} "
+            "a BookListWidget (Categoría: ${category.name})",
+          );
+
           return BookListWidget(
             category: category,
             books: snapshot.data!,
-            idPerfil: widget.profileId ?? 0, // o el valor por defecto que uses
+            idPerfil: widget.profileId ?? 0,
           );
         }
 

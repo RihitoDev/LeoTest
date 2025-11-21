@@ -137,11 +137,39 @@ class ProfileService {
     }
   }
 
-  /// Fallback para mantener compatibilidad con métodos antiguos si los necesitas
-  static Future<UserProfileData> fetchProfileData() async {
+  // 🔥 AHORA: fetchProfileData admite idPerfil y mantiene compatibilidad
+  static Future<UserProfileData> fetchProfileData([int? idPerfil]) async {
+    // Si llega ID desde la vista → usar ese endpoint directo
+    if (idPerfil != null) {
+      try {
+        final response = await http.get(Uri.parse("$_baseUrl/$idPerfil"));
+        if (response.statusCode == 200) {
+          final data = json.decode(response.body);
+
+          return UserProfileData(
+            idPerfil: data['id_perfil'],
+            nombreUsuario: data['nombre_perfil'],
+            nombrePerfil: data['nombre_perfil'],
+            email: SIMULATED_EMAIL,
+            edad: data['edad'] ?? 0,
+            nivelEducativo: data['nombre_nivel_educativo'] ?? "",
+            rachaDias: data['racha_dias'] ?? 0,
+            librosLeidos: data['libros_leidos'] ?? 0,
+            porcentajeAciertos: (data['porcentaje_aciertos'] as num?)
+                ?.toDouble(),
+            imagenPerfil: data['imagen_perfil'],
+          );
+        }
+      } catch (e) {
+        print("fetchProfileData error (idPerfil): $e");
+      }
+    }
+
+    // Fallback → como antes
     final userId = _currentUserId;
     final profile = await fetchProfileForUser(userId);
     if (profile != null) return profile;
+
     return UserProfileData(
       idPerfil: null,
       nombreUsuario: "Invitado",
