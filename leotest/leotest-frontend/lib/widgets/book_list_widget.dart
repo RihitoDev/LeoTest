@@ -20,11 +20,13 @@ class BookListWidget extends StatelessWidget {
 
   /// IDs de libros favoritos
   final Set<int> favoritos;
+  final int idPerfil;
 
   const BookListWidget({
     super.key,
     required this.category, // Modificado
     required this.books,
+    required this.idPerfil,
     this.mostrarFavorito = false,
     this.onToggleFavorito,
     this.favoritos = const {},
@@ -47,7 +49,10 @@ class BookListWidget extends StatelessWidget {
         children: [
           // ✅ 3. MODIFICADO: Título de la sección ahora en un Row
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+            padding: const EdgeInsets.symmetric(
+              horizontal: 16.0,
+              vertical: 8.0,
+            ),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               crossAxisAlignment: CrossAxisAlignment.center,
@@ -68,8 +73,10 @@ class BookListWidget extends StatelessWidget {
                     Navigator.push(
                       context,
                       MaterialPageRoute(
-                        builder: (context) =>
-                            CategoryDetailView(category: category),
+                        builder: (context) => CategoryDetailView(
+                          category: category,
+                          idPerfil: idPerfil,
+                        ),
                       ),
                     );
                   },
@@ -101,10 +108,14 @@ class BookListWidget extends StatelessWidget {
                     Navigator.push(
                       context,
                       MaterialPageRoute(
-                        builder: (context) => BookDetailView(book: book),
+                        builder: (context) => BookDetailView(
+                          book: book,
+                          idPerfil: idPerfil, // 🔥 PASAMOS EL PERFIL AQUÍ
+                        ),
                       ),
                     );
                   },
+
                   child: Container(
                     width: 100,
                     margin: const EdgeInsets.only(right: 16.0),
@@ -130,13 +141,16 @@ class BookListWidget extends StatelessWidget {
                                       image: book.portada.startsWith('http')
                                           ? NetworkImage(book.portada)
                                           : AssetImage(book.portada)
-                                              as ImageProvider,
+                                                as ImageProvider,
                                       fit: BoxFit.cover,
                                       // Manejo de error de imagen
                                       onError: (exception, stackTrace) =>
                                           const Center(
-                                              child: Icon(Icons.broken_image,
-                                                  color: Colors.grey)),
+                                            child: Icon(
+                                              Icons.broken_image,
+                                              color: Colors.grey,
+                                            ),
+                                          ),
                                     )
                                   : null,
                             ),

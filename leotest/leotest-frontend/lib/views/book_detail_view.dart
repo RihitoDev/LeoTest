@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/scheduler.dart';
 import 'package:leotest/models/book.dart';
 import 'package:leotest/models/user_book_progress.dart';
 import 'package:leotest/services/my_books_service.dart';
@@ -7,7 +8,9 @@ import 'package:leotest/views/book_reader_view.dart';
 
 class BookDetailView extends StatefulWidget {
   final Book book;
-  const BookDetailView({super.key, required this.book});
+  final int idPerfil; // 🔹 NUEVO PARÁMETRO
+
+  const BookDetailView({super.key, required this.book, required this.idPerfil});
 
   @override
   State<BookDetailView> createState() => _BookDetailViewState();
@@ -18,21 +21,24 @@ class _BookDetailViewState extends State<BookDetailView> {
   bool _isLoading = true;
   bool _isFavorito = false;
 
-  final int idPerfil = 2; // Temporal: reemplazar con usuario autenticado
-
   @override
   void initState() {
     super.initState();
-    _fetchBookProgress();
-    _cargarFavorito();
+
+    SchedulerBinding.instance.addPostFrameCallback((_) {
+      _fetchBookProgress();
+      _cargarFavorito();
+    });
   }
 
   Future<void> _cargarFavorito() async {
     try {
       final favoritos = await FavoritoService.obtenerFavoritos(
-        idPerfil: idPerfil,
+        idPerfil: widget.idPerfil,
       );
-      setState(() => _isFavorito = favoritos.contains(widget.book.idLibro));
+      if (mounted) {
+        setState(() => _isFavorito = favoritos.contains(widget.book.idLibro));
+      }
     } catch (e) {
       print('Error al verificar favorito: $e');
     }
@@ -42,7 +48,7 @@ class _BookDetailViewState extends State<BookDetailView> {
     try {
       if (_isFavorito) {
         await FavoritoService.quitarFavorito(
-          idPerfil: idPerfil,
+          idPerfil: widget.idPerfil,
           idLibro: widget.book.idLibro,
         );
         ScaffoldMessenger.of(context).showSnackBar(
@@ -50,19 +56,33 @@ class _BookDetailViewState extends State<BookDetailView> {
         );
       } else {
         await FavoritoService.agregarFavorito(
-          idPerfil: idPerfil,
+          idPerfil: widget.idPerfil,
           idLibro: widget.book.idLibro,
         );
+
+        // Si no existe en MyBooks, agregar automáticamente
+        if (_bookProgress == null) {
+          try {
+            await MyBooksService.addBookToLibrary(widget.book, widget.idPerfil);
+            await _fetchBookProgress();
+          } catch (e) {
+            print('Error al agregar libro a MyBooks desde BookDetail: $e');
+          }
+        }
+
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Libro añadido a favoritos.')),
         );
       }
-      setState(() => _isFavorito = !_isFavorito);
+
+      if (mounted) setState(() => _isFavorito = !_isFavorito);
     } catch (e) {
       print('Error al actualizar favorito: $e');
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Error al actualizar favorito.')),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Error al actualizar favorito.')),
+        );
+      }
     }
   }
 
@@ -70,32 +90,36 @@ class _BookDetailViewState extends State<BookDetailView> {
     try {
       final progress = await MyBooksService.getBookProgress(
         widget.book.titulo ?? "Título desconocido",
+        widget.idPerfil, // 🔹 idPerfil obligatorio
       );
-      setState(() {
-        _bookProgress = progress;
-        _isLoading = false;
-      });
+      if (mounted) {
+        setState(() {
+          _bookProgress = progress;
+          _isLoading = false;
+        });
+      }
     } catch (e) {
       print("Error al cargar progreso: $e");
-      setState(() => _isLoading = false);
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
   void _startReading() async {
     if (_bookProgress == null) {
-      await MyBooksService.addBookToLibrary(widget.book);
-      await _fetchBookProgress();
+      await MyBooksService.addBookToLibrary(widget.book, widget.idPerfil);
     }
-
     final initialPage = _bookProgress?.currentPage ?? 0;
 
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) =>
-            BookReaderView(book: widget.book, initialPage: initialPage),
+        builder: (context) => BookReaderView(
+          book: widget.book,
+          initialPage: initialPage,
+          idPerfil: widget.idPerfil,
+        ),
       ),
-    ).then((_) => _fetchBookProgress());
+    ).then((_) => _fetchBookProgress()); // 🔹 refresca al volver
   }
 
   Widget _buildCover(String? portada) {
@@ -229,7 +253,6 @@ class _BookDetailViewState extends State<BookDetailView> {
                 borderRadius: BorderRadius.circular(4),
               ),
               const SizedBox(height: 20),
-              // ❤️ Ícono de favorito debajo del progreso
               Align(
                 alignment: Alignment.centerRight,
                 child: IconButton(
@@ -238,11 +261,6 @@ class _BookDetailViewState extends State<BookDetailView> {
                     _isFavorito ? Icons.favorite : Icons.favorite_border,
                     color: _isFavorito ? Colors.redAccent : Colors.white,
                     size: 28,
-                  ),
-                  style: ButtonStyle(
-                    backgroundColor: WidgetStateProperty.all(
-                      Colors.grey.withOpacity(0.4),
-                    ),
                   ),
                   tooltip: _isFavorito
                       ? 'Quitar de favoritos'

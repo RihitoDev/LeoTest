@@ -1,5 +1,5 @@
 class UserBookProgress {
-  final String userId;
+  final int idPerfil; // 🔥 Ahora es entero, no String
   final int idProgreso;
   final int idLibro;
   final String title;
@@ -17,7 +17,7 @@ class UserBookProgress {
       totalPages > 0 ? currentPage / totalPages : 0.0;
 
   UserBookProgress({
-    required this.userId,
+    required this.idPerfil, // 🔥 cambiado
     required this.idProgreso,
     required this.idLibro,
     required this.title,
@@ -31,10 +31,9 @@ class UserBookProgress {
     this.categoria,
   });
 
-  factory UserBookProgress.fromJson(
-      Map<String, dynamic> json, String currentUserId) {
+  factory UserBookProgress.fromJson(Map<String, dynamic> json, int idPerfil) {
     return UserBookProgress(
-      userId: currentUserId,
+      idPerfil: idPerfil, // 🔥 antes era userId: currentUserId
       idProgreso: json['id_progreso'] as int,
       idLibro: json['id_libro'] as int,
       title: json['titulo'] as String,
@@ -51,7 +50,7 @@ class UserBookProgress {
 
   UserBookProgress copyWith({int? currentPage, String? estado}) {
     return UserBookProgress(
-      userId: userId,
+      idPerfil: idPerfil, // 🔥 actualizado
       idProgreso: idProgreso,
       idLibro: idLibro,
       title: title,

@@ -5,7 +5,9 @@ import 'package:leotest/models/mission.dart';
 import 'package:leotest/services/mission_service.dart';
 
 class MissionsView extends StatefulWidget {
-  const MissionsView({super.key});
+  final int? profileId;
+
+  const MissionsView({super.key, this.profileId});
 
   @override
   State<MissionsView> createState() => _MissionsViewState();
@@ -17,9 +19,12 @@ class _MissionsViewState extends State<MissionsView>
   late TabController _tabController;
   final List<String> _tabs = const ['Diarias', 'Mensuales', 'Generales'];
 
+  late int idPerfil;
+
   @override
   void initState() {
     super.initState();
+    idPerfil = widget.profileId ?? 0;
     _tabController = TabController(length: _tabs.length, vsync: this);
     _loadMissions();
   }
@@ -44,14 +49,23 @@ class _MissionsViewState extends State<MissionsView>
         return AlertDialog(
           title: const Text('Completar Misión'),
           content: Text(
-              '¿Marcar la misión "${mission.nombreMision}" como completada?'),
+            '¿Marcar la misión "${mission.nombreMision}" como completada?',
+          ),
           actions: <Widget>[
             TextButton(
-                onPressed: () => Navigator.of(dialogContext).pop(false),
-                child: const Text('Cancelar', style: TextStyle(color: Colors.grey))),
+              onPressed: () => Navigator.of(dialogContext).pop(false),
+              child: const Text(
+                'Cancelar',
+                style: TextStyle(color: Colors.grey),
+              ),
+            ),
             TextButton(
-                onPressed: () => Navigator.of(dialogContext).pop(true),
-                child: Text('Confirmar', style: TextStyle(color: Theme.of(context).colorScheme.primary))),
+              onPressed: () => Navigator.of(dialogContext).pop(true),
+              child: Text(
+                'Confirmar',
+                style: TextStyle(color: Theme.of(context).colorScheme.primary),
+              ),
+            ),
           ],
         );
       },
@@ -59,30 +73,37 @@ class _MissionsViewState extends State<MissionsView>
 
     if (confirmed == true) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Completando misión "${mission.nombreMision}"...')),
+        SnackBar(
+          content: Text('Completando misión "${mission.nombreMision}"...'),
+        ),
       );
 
-      final success = await MissionService.completeMission(mission.idUsuarioMision);
-      
+      final success = await MissionService.completeMission(
+        mission.idUsuarioMision,
+      );
+
       ScaffoldMessenger.of(context).hideCurrentSnackBar();
 
       if (success && mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-              content: Text('¡Misión completada: ${mission.nombreMision}!'),
-              backgroundColor: Colors.green[700]),
+            content: Text('¡Misión completada: ${mission.nombreMision}!'),
+            backgroundColor: Colors.green[700],
+          ),
         );
         _loadMissions(); // Recarga la lista para reflejar los cambios
       } else if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-              content: Text('Error al completar la misión. Verifique su progreso.'),
-              backgroundColor: Colors.red),
+            content: Text(
+              'Error al completar la misión. Verifique su progreso.',
+            ),
+            backgroundColor: Colors.red,
+          ),
         );
       }
     }
   }
-
 
   @override
   Widget build(BuildContext context) {
@@ -90,8 +111,10 @@ class _MissionsViewState extends State<MissionsView>
 
     return Scaffold(
       appBar: AppBar(
-        title: Text('Mis Misiones',
-            style: TextStyle(fontWeight: FontWeight.w900, color: primaryColor)),
+        title: Text(
+          'Mis Misiones',
+          style: TextStyle(fontWeight: FontWeight.w900, color: primaryColor),
+        ),
         backgroundColor: const Color.fromARGB(255, 0, 4, 8),
         elevation: 1,
         automaticallyImplyLeading: false,
@@ -107,17 +130,22 @@ class _MissionsViewState extends State<MissionsView>
         future: _futureMissions,
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
-            return Center(child: CircularProgressIndicator(color: primaryColor));
+            return Center(
+              child: CircularProgressIndicator(color: primaryColor),
+            );
           }
 
           if (snapshot.hasError) {
             return Center(
-                child: Text('Error: ${snapshot.error}',
-                    style: const TextStyle(color: Colors.red)));
+              child: Text(
+                'Error: ${snapshot.error}',
+                style: const TextStyle(color: Colors.red),
+              ),
+            );
           }
 
           final allMissions = snapshot.data ?? [];
-          
+
           // Clasificación de misiones basada en la propiedad 'frecuencia'
           final dailyMissions = allMissions
               .where((m) => m.frecuencia.toLowerCase() == 'diarias')
@@ -146,11 +174,15 @@ class _MissionsViewState extends State<MissionsView>
   Widget _buildMissionList(BuildContext context, List<Mission> missions) {
     if (missions.isEmpty) {
       return const Center(
-          child: Padding(
-            padding: EdgeInsets.all(20.0),
-            child: Text('No hay misiones activas en esta categoría.',
-                style: TextStyle(color: Colors.white70, fontSize: 16), textAlign: TextAlign.center),
-          ));
+        child: Padding(
+          padding: EdgeInsets.all(20.0),
+          child: Text(
+            'No hay misiones activas en esta categoría.',
+            style: TextStyle(color: Colors.white70, fontSize: 16),
+            textAlign: TextAlign.center,
+          ),
+        ),
+      );
     }
 
     return ListView.builder(
@@ -158,7 +190,10 @@ class _MissionsViewState extends State<MissionsView>
       itemCount: missions.length,
       itemBuilder: (context, index) {
         final mission = missions[index];
-        final isComplete = mission.misionCompleta || mission.progressPercentage >= 1.0; // Considerar completa si el progreso alcanza 100%
+        final isComplete =
+            mission.misionCompleta ||
+            mission.progressPercentage >=
+                1.0; // Considerar completa si el progreso alcanza 100%
         final primaryColor = Theme.of(context).colorScheme.primary;
 
         return Card(
@@ -169,17 +204,27 @@ class _MissionsViewState extends State<MissionsView>
               Icons.task_alt,
               color: isComplete ? Colors.green : primaryColor,
             ),
-            title: Text(mission.nombreMision,
-                style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
+            title: Text(
+              mission.nombreMision,
+              style: const TextStyle(
+                fontWeight: FontWeight.bold,
+                color: Colors.white,
+              ),
+            ),
             subtitle: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(mission.descripcionMision, style: const TextStyle(color: Colors.grey)),
+                Text(
+                  mission.descripcionMision,
+                  style: const TextStyle(color: Colors.grey),
+                ),
                 const SizedBox(height: 5),
                 LinearProgressIndicator(
                   value: mission.progressPercentage,
                   backgroundColor: Colors.grey[800],
-                  valueColor: AlwaysStoppedAnimation<Color>(isComplete ? Colors.green : primaryColor),
+                  valueColor: AlwaysStoppedAnimation<Color>(
+                    isComplete ? Colors.green : primaryColor,
+                  ),
                   minHeight: 5,
                 ),
                 const SizedBox(height: 3),
@@ -191,11 +236,22 @@ class _MissionsViewState extends State<MissionsView>
             ),
             // Trailing: Muestra la estrella o el botón para completar
             trailing: isComplete
-                ? const Icon(Icons.star, color: Colors.amber, size: 30) // Estrella Dorada (HU-16.1)
+                ? const Icon(
+                    Icons.star,
+                    color: Colors.amber,
+                    size: 30,
+                  ) // Estrella Dorada (HU-16.1)
                 : IconButton(
-                    icon: const Icon(Icons.check_circle_outline, color: Colors.white70),
-                    onPressed: mission.progressPercentage >= 1.0 ? () => _handleCompleteMission(mission) : null,
-                    tooltip: mission.progressPercentage >= 1.0 ? 'Marcar como Completada' : 'Progreso insuficiente',
+                    icon: const Icon(
+                      Icons.check_circle_outline,
+                      color: Colors.white70,
+                    ),
+                    onPressed: mission.progressPercentage >= 1.0
+                        ? () => _handleCompleteMission(mission)
+                        : null,
+                    tooltip: mission.progressPercentage >= 1.0
+                        ? 'Marcar como Completada'
+                        : 'Progreso insuficiente',
                   ),
             onTap: () {
               // Navegar a detalles si fuera necesario

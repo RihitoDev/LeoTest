@@ -8,7 +8,14 @@ import 'package:leotest/views/book_detail_view.dart';
 class CategoryDetailView extends StatelessWidget {
   final Category category;
 
-  const CategoryDetailView({super.key, required this.category});
+  //AGREGADO: el ID del perfil del usuario
+  final int idPerfil;
+
+  const CategoryDetailView({
+    super.key,
+    required this.category,
+    required this.idPerfil, // <-- AGREGADO
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -17,11 +24,8 @@ class CategoryDetailView extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(
         title: Text(
-          category.name, // Título de la categoría
-          style: TextStyle(
-            fontWeight: FontWeight.w900,
-            color: primaryColor,
-          ),
+          category.name,
+          style: TextStyle(fontWeight: FontWeight.w900, color: primaryColor),
         ),
         backgroundColor: const Color.fromARGB(255, 0, 4, 8),
         elevation: 1,
@@ -29,17 +33,14 @@ class CategoryDetailView extends StatelessWidget {
       body: Container(
         color: const Color.fromARGB(255, 3, 0, 12),
         child: FutureBuilder<List<Book>>(
-          // Llama al servicio para buscar libros solo por esta categoría
           future: BookService.buscarLibros(categoriaId: category.id.toString()),
           builder: (context, snapshot) {
-            // --- Estado de Carga ---
             if (snapshot.connectionState == ConnectionState.waiting) {
               return Center(
                 child: CircularProgressIndicator(color: primaryColor),
               );
             }
 
-            // --- Estado de Error ---
             if (snapshot.hasError) {
               return Center(
                 child: Padding(
@@ -53,18 +54,16 @@ class CategoryDetailView extends StatelessWidget {
               );
             }
 
-            // --- Estado de Éxito (con datos) ---
             if (snapshot.hasData && snapshot.data!.isNotEmpty) {
               final books = snapshot.data!;
 
-              // Usamos GridView para un mejor despliegue de muchos libros
               return GridView.builder(
                 padding: const EdgeInsets.all(16.0),
                 gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: 3, // 3 libros por fila
+                  crossAxisCount: 3,
                   crossAxisSpacing: 16.0,
                   mainAxisSpacing: 16.0,
-                  childAspectRatio: 0.6, // Ajuste para altura (portada + texto)
+                  childAspectRatio: 0.6,
                 ),
                 itemCount: books.length,
                 itemBuilder: (context, index) {
@@ -74,7 +73,6 @@ class CategoryDetailView extends StatelessWidget {
               );
             }
 
-            // --- Estado de Éxito (sin datos) ---
             return const Center(
               child: Padding(
                 padding: EdgeInsets.all(32.0),
@@ -91,31 +89,31 @@ class CategoryDetailView extends StatelessWidget {
     );
   }
 
-  /// Widget auxiliar para mostrar cada libro en la cuadrícula
   Widget _buildBookGridItem(BuildContext context, Book book) {
     const cardColor = Color.fromARGB(255, 30, 30, 30);
     final isNetworkImage = book.portada.startsWith('http');
 
-    // 1. Elegir la imagen y el proveedor fuera del DecorationImage
     final ImageProvider imageProvider = (book.portada.isNotEmpty)
         ? (isNetworkImage
-            ? NetworkImage(book.portada)
-            : AssetImage(book.portada) as ImageProvider)
-        : const AssetImage('assets/images/placeholder.png'); // Usa un placeholder si está vacío
+              ? NetworkImage(book.portada)
+              : AssetImage(book.portada) as ImageProvider)
+        : const AssetImage('assets/images/placeholder.png');
 
     return GestureDetector(
       onTap: () {
         Navigator.push(
           context,
           MaterialPageRoute(
-            builder: (context) => BookDetailView(book: book),
+            builder: (context) => BookDetailView(
+              book: book,
+              idPerfil: idPerfil, // <-- AHORA SÍ
+            ),
           ),
         );
       },
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Portada
           Expanded(
             child: Container(
               decoration: BoxDecoration(
@@ -128,13 +126,7 @@ class CategoryDetailView extends StatelessWidget {
                     offset: const Offset(2, 4),
                   ),
                 ],
-                // 2. Usar ImageProvider simple, eliminando errorBuilder de DecorationImage
-                image: DecorationImage(
-                  image: imageProvider,
-                  fit: BoxFit.cover,
-                  // Nota: Si la imagen de red falla, DecorationImage por defecto no mostrará nada,
-                  // pero es la forma correcta de usarlo con BoxDecoration.
-                ),
+                image: DecorationImage(image: imageProvider, fit: BoxFit.cover),
               ),
               alignment: Alignment.center,
               child: (book.portada.isEmpty)
@@ -143,7 +135,6 @@ class CategoryDetailView extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 8),
-          // Título
           Text(
             book.titulo,
             maxLines: 1,
@@ -154,15 +145,11 @@ class CategoryDetailView extends StatelessWidget {
               color: Colors.white,
             ),
           ),
-          // Autor
           Text(
             book.autor,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
-            style: TextStyle(
-              fontSize: 11,
-              color: Colors.grey[400],
-            ),
+            style: TextStyle(fontSize: 11, color: Colors.grey[400]),
           ),
         ],
       ),
