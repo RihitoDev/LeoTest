@@ -107,9 +107,13 @@ def simple_split_by_length(full_text: str, num_chapters: int) -> Dict[int, str]:
 
 
 def divide_text_into_chapters(full_text: str, num_chapters: int) -> Dict[int, str]:
-    chapter_pattern = r"(?:^|\n)(?:Cap[ií]tulo\s+\d+|CAP[IÍ]TULO\s+\d+|Cap\.?\s*\d+|[IVXLCDM]+\s*\n)"
+    # 1. Eliminar sección de ÍNDICE antes de procesar
+    full_text = re.sub(r"ÍNDICE(.+?)(I\.\s+)", r"\2", full_text, flags=re.DOTALL | re.IGNORECASE)
 
-    matches = list(re.finditer(chapter_pattern, full_text, re.IGNORECASE))
+    # 2. Patrón más robusto para detectar capítulos REALES
+    chapter_pattern = r"(?:^|\n)(?:Cap[ií]tulo\s+\d+|CAP[IÍ]TULO\s+\d+|Cap\.?\s*\d+|[IVXLCDM]+\s*\.\s+[A-ZÁÉÍÓÚÑ].+)"
+    
+    matches = list(re.finditer(chapter_pattern, full_text, re.MULTILINE))
 
     if not matches:
         return simple_split_by_length(full_text, num_chapters)
@@ -121,6 +125,7 @@ def divide_text_into_chapters(full_text: str, num_chapters: int) -> Dict[int, st
         chapters[i + 1] = full_text[start:end].strip()
 
     return chapters
+
 
 
 # -----------------------------
@@ -200,17 +205,16 @@ def generate_questions_from_text(text_fragment: str, id_capitulo: int) -> List[P
     Genera exactamente 3 preguntas basadas SOLO en el texto:
 
     1) Literal: tipo aleatorio (opcion_multiple o falso_verdadero), mínimo 2 opciones
-    2) Inferencial: tipo opcion_multiple, mínimo 3 opciones
-    3) Crítico: tipo opcion_multiple, mínimo 3 opciones
+    2) Inferencial: opcion_multiple, mínimo 3 opciones
+    3) Crítico: opcion_multiple, mínimo 3 opciones
 
     id_capitulo = {id_capitulo}
 
     TEXTO:
     {text_fragment}
 
-    IMPORTANTE: 
-    - Devuelve **solo JSON**, sin explicaciones.
-    - Asegúrate de que cada pregunta tenga al menos 2 opciones.
+    IMPORTANTE:
+    - Devuelve solo JSON.
     - Para falso_verdadero, las opciones deben ser "Verdadero" y "Falso".
     """
 
@@ -219,6 +223,19 @@ def generate_questions_from_text(text_fragment: str, id_capitulo: int) -> List[P
             prompt,
             generation_config={"temperature": 0.4},
         )
+
+        # ----------------------------------------------------------
+        # 🔥 MANEJO DE BLOQUEO DE GEMINI
+        # ----------------------------------------------------------
+        if not response.candidates:
+            reason = (
+                response.prompt_feedback.block_reason
+                if response.prompt_feedback else "desconocida"
+            )
+            logging.error(f"❌ Gemini bloqueó el contenido del capítulo. Razón: {reason}")
+            return []   # Nunca intentamos leer response.text
+
+        # Si no está bloqueado, es seguro usar response.text
         raw = response.text or ""
 
     except Exception as e:
@@ -227,43 +244,59 @@ def generate_questions_from_text(text_fragment: str, id_capitulo: int) -> List[P
 
     logging.info(f"Respuesta cruda Gemini (len {len(raw)}): {raw[:2000]}")
 
+    # ----------------------------------------------------------
+    # Extraer el JSON
+    # ----------------------------------------------------------
     parsed = _extract_json_from_text(raw)
     if parsed is None:
         logging.error("No JSON extraído de Gemini.")
         return []
 
+    # Puede venir como lista o con clave "questions"
     questions_list = parsed if isinstance(parsed, list) else parsed.get("questions", [])
     valid_questions = []
 
+    # ----------------------------------------------------------
+    # Validar y convertir preguntas
+    # ----------------------------------------------------------
     for q in questions_list:
         try:
             q["id_capitulo"] = int(id_capitulo)
 
-            # Validar opciones
+            # Validar existencia de opciones
             if "opciones" not in q or not isinstance(q["opciones"], list):
                 logging.warning("Pregunta sin opciones válidas, se omite.")
                 continue
 
-            # Validar tipo falso_verdadero
+            # Normalizar preguntas de Falso-Verdadero
             if q.get("tipo") == "falso_verdadero":
                 q["opciones"] = [
-                    {"texto_opcion": "Verdadero", "opcion_correcta": q["opciones"][0].get("opcion_correcta", True)},
-                    {"texto_opcion": "Falso", "opcion_correcta": not q["opciones"][0].get("opcion_correcta", True)}
+                    {
+                        "texto_opcion": "Verdadero",
+                        "opcion_correcta": q["opciones"][0].get("opcion_correcta", True)
+                    },
+                    {
+                        "texto_opcion": "Falso",
+                        "opcion_correcta": not q["opciones"][0].get("opcion_correcta", True)
+                    },
                 ]
 
-            # Validar número mínimo de opciones
+            # Requerimiento mínimo de opciones
             min_opts = 2 if q.get("nivel_comprension") == "literal" else 3
+
             if len(q["opciones"]) < min_opts:
-                logging.warning(f"Pregunta con menos de {min_opts} opciones, se omite: {q['enunciado']}")
+                logging.warning(
+                    f"Pregunta con menos de {min_opts} opciones, se omite: {q.get('enunciado')}"
+                )
                 continue
 
-            # Parsear Pydantic
+            # Validación con Pydantic
             p = Pregunta.parse_obj({
                 "id_capitulo": q["id_capitulo"],
                 "nivel_comprension": q.get("nivel_comprension", "literal"),
                 "enunciado": q["enunciado"],
                 "tipo": q.get("tipo", "opcion_multiple"),
-                "opciones": q["opciones"]
+                "opciones": q["opciones"],
             })
 
             valid_questions.append(p)
@@ -273,6 +306,7 @@ def generate_questions_from_text(text_fragment: str, id_capitulo: int) -> List[P
 
     logging.info(f"Generadas válidas para cap {id_capitulo}: {len(valid_questions)}")
     return valid_questions
+
 
 # -----------------------------
 # HELPERS
@@ -299,8 +333,19 @@ def process_full_book(input_data: BookProcessingInput):
         total_saved = 0
 
         for chapter_num, fragment in chapters.items():
-            chapter_title = f"Capítulo {chapter_num}"
-            logging.info(f"Procesando {chapter_title}...")
+            raw_header = fragment.split("\n", 1)[0].strip()
+
+            # Detectar títulos estilo: "I. TÍTULO"
+            match = re.match(r"^([IVXLCDM]+)\.\s+(.+)$", raw_header.strip(), re.IGNORECASE)
+
+            if match:
+                titulo_detectado = match.group(2)
+                chapter_title = titulo_detectado
+            else:
+                chapter_title = f"Capítulo {chapter_num}"
+
+            logging.info(f"Procesando capítulo: {chapter_title}")
+
 
             chapter_payload = {
                 "id_libro": input_data.id_libro,

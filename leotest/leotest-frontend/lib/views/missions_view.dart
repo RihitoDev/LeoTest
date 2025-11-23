@@ -1,5 +1,3 @@
-// lib/views/missions_view.dart
-
 import 'package:flutter/material.dart';
 import 'package:leotest/models/mission.dart';
 import 'package:leotest/services/mission_service.dart';
@@ -18,7 +16,6 @@ class _MissionsViewState extends State<MissionsView>
   late Future<List<Mission>> _futureMissions;
   late TabController _tabController;
   final List<String> _tabs = const ['Diarias', 'Mensuales', 'Generales'];
-
   late int idPerfil;
 
   @override
@@ -31,7 +28,7 @@ class _MissionsViewState extends State<MissionsView>
 
   void _loadMissions() {
     setState(() {
-      _futureMissions = MissionService.fetchActiveMissions();
+      _futureMissions = MissionService.fetchActiveMissions(idPerfil);
     });
   }
 
@@ -41,7 +38,7 @@ class _MissionsViewState extends State<MissionsView>
     super.dispose();
   }
 
-  /// Muestra el diálogo de confirmación y marca como completada (HU-10.4)
+  /// Muestra el diálogo de confirmación y marca la misión como completada
   Future<void> _handleCompleteMission(Mission mission) async {
     final bool? confirmed = await showDialog<bool>(
       context: context,
@@ -81,17 +78,18 @@ class _MissionsViewState extends State<MissionsView>
       final success = await MissionService.completeMission(
         mission.idUsuarioMision,
       );
-
       ScaffoldMessenger.of(context).hideCurrentSnackBar();
 
       if (success && mounted) {
+        setState(() {
+          _futureMissions = MissionService.fetchActiveMissions(idPerfil);
+        });
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('¡Misión completada: ${mission.nombreMision}!'),
             backgroundColor: Colors.green[700],
           ),
         );
-        _loadMissions(); // Recarga la lista para reflejar los cambios
       } else if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -134,7 +132,6 @@ class _MissionsViewState extends State<MissionsView>
               child: CircularProgressIndicator(color: primaryColor),
             );
           }
-
           if (snapshot.hasError) {
             return Center(
               child: Text(
@@ -146,7 +143,6 @@ class _MissionsViewState extends State<MissionsView>
 
           final allMissions = snapshot.data ?? [];
 
-          // Clasificación de misiones basada en la propiedad 'frecuencia'
           final dailyMissions = allMissions
               .where((m) => m.frecuencia.toLowerCase() == 'diarias')
               .toList();
@@ -170,7 +166,7 @@ class _MissionsViewState extends State<MissionsView>
     );
   }
 
-  // Widget auxiliar para construir las listas de misiones
+  /// Widget auxiliar para construir la lista de misiones
   Widget _buildMissionList(BuildContext context, List<Mission> missions) {
     if (missions.isEmpty) {
       return const Center(
@@ -191,9 +187,7 @@ class _MissionsViewState extends State<MissionsView>
       itemBuilder: (context, index) {
         final mission = missions[index];
         final isComplete =
-            mission.misionCompleta ||
-            mission.progressPercentage >=
-                1.0; // Considerar completa si el progreso alcanza 100%
+            mission.misionCompleta || mission.progressPercentage >= 1.0;
         final primaryColor = Theme.of(context).colorScheme.primary;
 
         return Card(
@@ -229,18 +223,14 @@ class _MissionsViewState extends State<MissionsView>
                 ),
                 const SizedBox(height: 3),
                 Text(
-                  'Progreso: ${mission.progresoMision.toStringAsFixed(1)} / ${mission.cantidadObjetivo} (${(mission.progressPercentage * 100).toInt()}%)',
+                  'Progreso: ${mission.progresoMision.toStringAsFixed(1)} / ${mission.cantidadObjetivo} '
+                  '(${(mission.progressPercentage * 100).toInt()}%)',
                   style: const TextStyle(fontSize: 12, color: Colors.white54),
                 ),
               ],
             ),
-            // Trailing: Muestra la estrella o el botón para completar
             trailing: isComplete
-                ? const Icon(
-                    Icons.star,
-                    color: Colors.amber,
-                    size: 30,
-                  ) // Estrella Dorada (HU-16.1)
+                ? const Icon(Icons.star, color: Colors.amber, size: 30)
                 : IconButton(
                     icon: const Icon(
                       Icons.check_circle_outline,
@@ -253,9 +243,6 @@ class _MissionsViewState extends State<MissionsView>
                         ? 'Marcar como Completada'
                         : 'Progreso insuficiente',
                   ),
-            onTap: () {
-              // Navegar a detalles si fuera necesario
-            },
           ),
         );
       },

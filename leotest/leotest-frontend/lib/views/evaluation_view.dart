@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:leotest/services/auth_service.dart';
 import 'package:leotest/services/evaluation_service.dart';
+import 'package:leotest/services/mission_service.dart';
+import 'package:leotest/services/stats_service.dart';
 
 class EvaluationView extends StatefulWidget {
   final int idCapitulo;
@@ -79,19 +82,33 @@ class _EvaluationViewState extends State<EvaluationView> {
   }
 
   Future<void> _submit() async {
+    print("=================================================");
+    print("📘 INICIO DE ENVÍO DE EVALUACIÓN");
+    print("=================================================");
+
     final endTime = DateTime.now();
     final minutosLeidos = endTime.difference(_startTime).inMinutes;
 
+    print("⏱ Minutos leídos calculados: $minutosLeidos");
+    print("👤 ID Perfil: ${widget.idPerfil}");
+    print("📚 ID Libro: ${widget.idLibro}");
+    print("=================================================");
+
+    // Preparar respuestas
     final respuestas = _selectedOption.entries
         .map((e) => {"id_pregunta": e.key, "id_opcion_multiple": e.value})
         .toList();
 
-    print("🔹 Enviando respuestas al backend:");
+    print("📨 Respuestas seleccionadas LISTAS para enviar:");
     for (var r in respuestas) {
       print(
-        "Pregunta ${r['id_pregunta']} -> Opción seleccionada: ${r['id_opcion_multiple']}",
+        "   • Pregunta ${r['id_pregunta']} → Opción: ${r['id_opcion_multiple']}",
       );
     }
+
+    print("=================================================");
+    print("🚀 Enviando evaluación al backend...");
+    print("=================================================");
 
     final resp = await EvaluationService.submitEvaluation(
       idLibro: widget.idLibro,
@@ -100,20 +117,29 @@ class _EvaluationViewState extends State<EvaluationView> {
       minutosLeidos: minutosLeidos,
     );
 
-    print("🔹 Respuesta del backend:");
+    print("=================================================");
+    print("📥 RESPUESTA RECIBIDA DEL BACKEND:");
     print(resp);
+    print("=================================================");
 
     if (resp['success'] == true) {
+      print("✅ Evaluación enviada correctamente");
       final resultados = (resp['data']['resultados'] as List<dynamic>?) ?? [];
 
-      print("🔹 Procesando resultados recibidos:");
+      print("-------------------------------------------------");
+      print("📊 Procesando resultados recibidos del backend...");
+      print("-------------------------------------------------");
+
       for (var r in resultados) {
         print(
-          "Pregunta ${r['id_pregunta']} -> seleccion_usuario: ${r['seleccion_usuario']}, opcion_correcta: ${r['opcion_correcta']}, correcta: ${r['correcta']}",
+          "   • Pregunta ${r['id_pregunta']} | "
+          "Elegida: ${r['seleccion_usuario']} | "
+          "Correcta: ${r['opcion_correcta']} | "
+          "¿Correcta? ${r['correcta']}",
         );
       }
 
-      // Guardar los resultados en los estados locales
+      // Actualizar estado local
       setState(() {
         for (var r in resultados) {
           final idPregunta = r['id_pregunta'] as int;
@@ -122,10 +148,52 @@ class _EvaluationViewState extends State<EvaluationView> {
           _correctOption[idPregunta] = r['opcion_correcta'] as int;
         }
 
-        _submitted = true; // <- Marcar como enviado
+        _submitted = true;
       });
+
+      // ⚡ Actualizar estadísticas en el backend
+      final totalPreguntas = resultados.length;
+      final correctas = resultados.where((r) => r['correcta'] == true).length;
+      final porcentajeAciertos = totalPreguntas > 0
+          ? ((correctas / totalPreguntas) * 100).round()
+          : 0;
+
+      try {
+        await StatsService.updateStats(
+          userId: int.parse(AuthService.getCurrentUserId()),
+          velocidadLectura: minutosLeidos,
+          porcentajeAciertos: porcentajeAciertos,
+        );
+
+        print("✅ Estadísticas actualizadas correctamente");
+      } catch (e) {
+        print("❌ Error al actualizar estadísticas: $e");
+      }
+
+      print("✅ Estadísticas actualizadas correctamente");
+
+      print("-------------------------------------------------");
+      print("🔥 ACTUALIZANDO MISIONES…");
+      print("-------------------------------------------------");
+
+      try {
+        final missions = await MissionService.fetchActiveMissions(
+          widget.idPerfil,
+        );
+        print("🎯 Misiones obtenidas después de actualización:");
+        print(missions);
+      } catch (e) {
+        print("❌ Error al actualizar misiones:");
+        print(e);
+      }
+
+      print("=================================================");
+      print("🎉 PROCESO DE ENVÍO DE EVALUACIÓN COMPLETADO");
+      print("=================================================");
     } else {
-      print("❌ Error enviando evaluación");
+      print("❌ Error enviando evaluación (backend retornó success=false)");
+      print("Razón: ${resp['message'] ?? 'Sin mensaje'}");
+
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Error enviando evaluación')),
       );

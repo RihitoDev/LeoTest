@@ -1,6 +1,7 @@
 // src/controllers/evaluation.controller.js
 import pool from "../db/connection.js";
 import fetch from "node-fetch";
+import { updateAllMissionProgress } from "./mission.controller.js";
 
 const IA_WORKER_URL = process.env.IA_WORKER_URL || "http://localhost:8000/api/ia";
 
@@ -330,6 +331,9 @@ console.log("✅ Resultados finales procesados:", resultados);
 
 
     await client.query("COMMIT");
+    
+    // 🔥 Actualizar misiones del usuario
+    await updateAllMissionProgress(idPerfil);
 
     return res.json({
       mensaje: "Evaluación registrada.",

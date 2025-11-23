@@ -50,6 +50,7 @@ export const loginUsuario = async (req, res) => {
     }
 
     try {
+        // Obtener usuario y rol
         const query = `
             SELECT 
                 u.id_usuario, 
@@ -73,18 +74,36 @@ export const loginUsuario = async (req, res) => {
             return res.status(401).json({ mensaje: "Usuario o contraseña incorrectos" });
         }
 
-        const userIdStr = user.id_usuario.toString();
+        const userId = user.id_usuario;
 
-        // Asignación de misiones
-        assignDailyMissions(userIdStr);
-        assignUniqueMissions(userIdStr, "Mensuales");
-        assignUniqueMissions(userIdStr, "Generales");
+        // Buscar id_perfil
+        const perfilResult = await pool.query(
+            `SELECT id_perfil FROM perfil WHERE id_usuario = $1`,
+            [userId]
+        );
+        const idPerfil = perfilResult.rows[0]?.id_perfil;
+
+        if (idPerfil) {
+            console.log(`Asignando misiones para id_perfil: ${idPerfil}`);
+
+            console.log(`-> assignDailyMissions(${idPerfil})`);
+            await assignDailyMissions(idPerfil.toString());
+
+            console.log(`-> assignUniqueMissions(${idPerfil}, "Mensuales")`);
+            await assignUniqueMissions(idPerfil.toString(), "Mensuales");
+
+            console.log(`-> assignUniqueMissions(${idPerfil}, "Generales")`);
+            await assignUniqueMissions(idPerfil.toString(), "Generales");
+        } else {
+            console.log(`Usuario ${userId} no tiene perfil, no se asignan misiones.`);
+        }
 
         res.status(200).json({
             exito: true,
-            id_usuario: user.id_usuario,
+            id_usuario: userId,
             nombre_usuario: user.nombre_usuario,
-            rol: user.nombre_rol 
+            rol: user.nombre_rol,
+            perfil_existente: !!idPerfil
         });
 
     } catch (error) {
@@ -92,6 +111,7 @@ export const loginUsuario = async (req, res) => {
         res.status(500).json({ mensaje: "Error interno del servidor" });
     }
 };
+
 
 
 // ==========================

@@ -5,10 +5,11 @@ import { getActiveMissions, completeMission, workerAssignMissions } from "../con
 
 const router = express.Router();
 
-router.get("/:userId", getActiveMissions);
+// routes
+router.get("/:profileId", getActiveMissions);
 router.put("/complete/:id_usuario_mision", completeMission);
 
-// Ruta para simulación de asignación por worker (propósito de prueba)
-router.post("/worker/assign", workerAssignMissions); 
+router.post('/assign', workerAssignMissions);
+
 
 export default router;
