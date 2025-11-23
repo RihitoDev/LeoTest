@@ -1,5 +1,4 @@
 // leotest-backend/src/controllers/stats.controller.js
-
 import pool from "../db/connection.js";
 
 const validateAndParseInt = (value, fieldName) => {
@@ -10,7 +9,6 @@ const validateAndParseInt = (value, fieldName) => {
     return intValue;
 };
 
-// Función auxiliar para obtener el ID de Perfil a partir del ID de Usuario
 async function getPerfilId(userIdInt, client) {
     const perfilResult = await client.query(
         "SELECT id_perfil FROM perfil WHERE id_usuario = $1",
@@ -22,66 +20,51 @@ async function getPerfilId(userIdInt, client) {
     return perfilResult.rows[0].id_perfil;
 }
 
-
 // =================================================================
-// 1. OBTENER RACHA DE LECTURA (HU-3.2, HU-3.3)
+// 1. OBTENER RACHA DESDE lecturas_diarias
 // =================================================================
 export const getCurrentStreak = async (req, res) => {
-    const { userId } = req.params;
-    let client;
+  const { userId } = req.params;
+  let client;
 
-    try {
-        const userIdInt = validateAndParseInt(userId, 'userId');
-        client = await pool.connect();
-        
-        // 🚨 PASO DE CORRECCIÓN: Obtener id_perfil para usar en la tabla 'evaluacion'
-        const perfilIdInt = await getPerfilId(userIdInt, client);
+  try {
+    const userIdInt = validateAndParseInt(userId, 'userId');
+    client = await pool.connect();
 
-        const rachaQuery = `
-            WITH fechas_unicas AS (
-                -- ✅ Corregido: Usar id_perfil
-                SELECT DISTINCT (fecha_actualizacion::date) AS dia 
-                FROM evaluacion
-                WHERE id_perfil = $1 
-            ),
-            dias_consecutivos AS (
-                SELECT
-                    dia,
-                    dia - (ROW_NUMBER() OVER (ORDER BY dia DESC) || ' day')::interval AS grupo_racha
-                FROM fechas_unicas
-                ORDER BY dia DESC
-            ),
-            racha_actual AS (
-                SELECT 
-                    COUNT(dia) AS racha_dias
-                FROM dias_consecutivos
-                WHERE grupo_racha = (
-                    SELECT grupo_racha FROM dias_consecutivos ORDER BY dia DESC LIMIT 1
-                )
-            )
-            SELECT COALESCE(r.racha_dias, 0) AS racha_actual
-            FROM racha_actual r;
-        `;
-        
-        // ✅ Corregido: Pasar id_perfil al query
-        const result = await client.query(rachaQuery, [perfilIdInt]);
-        const racha = result.rows[0]?.racha_actual || 0;
+    const perfilIdInt = await getPerfilId(userIdInt, client);
 
-        res.status(200).json({
-            exito: true,
-            racha_actual: parseInt(racha)
-        });
+    const rachaQuery = `
+      WITH fechas AS (
+        SELECT DISTINCT fecha_lectura::date AS dia
+        FROM lecturas_diarias
+        WHERE id_perfil = $1
+      ),
+      consecutivos AS (
+        SELECT dia,
+               dia - (ROW_NUMBER() OVER (ORDER BY dia DESC) || ' day')::interval AS grupo
+        FROM fechas
+      )
+      SELECT COALESCE(MAX(counts), 0) AS racha_actual FROM (
+        SELECT COUNT(*) AS counts
+        FROM consecutivos
+        GROUP BY grupo
+      ) AS sub;
+    `;
 
-    } catch (error) {
-        console.error("Error al obtener racha:", error);
-        res.status(500).json({ mensaje: "Error interno del servidor al calcular la racha." });
-    } finally {
-        if (client) client.release();
-    }
+    const result = await client.query(rachaQuery, [perfilIdInt]);
+    const racha = result.rows[0]?.racha_actual ?? 0;
+
+    res.status(200).json({ exito: true, racha_actual: parseInt(racha) });
+  } catch (e) {
+    console.error("Error obteniendo racha:", e);
+    res.status(500).json({ error: "Error interno" });
+  } finally {
+    if (client) client.release();
+  }
 };
 
 // =================================================================
-// 2. OBTENER ESTADÍSTICAS GENERALES (HU-3.4)
+// 2. ESTADÍSTICAS GENERALES (DATOS REALES)
 // =================================================================
 export const getGeneralStats = async (req, res) => {
     const { userId } = req.params;
@@ -91,60 +74,100 @@ export const getGeneralStats = async (req, res) => {
         const userIdInt = validateAndParseInt(userId, 'userId');
         client = await pool.connect();
 
-        // 🚨 PASO DE CORRECCIÓN: Obtener id_perfil
+        // Obtener id_perfil real
         const perfilIdInt = await getPerfilId(userIdInt, client);
 
-        // --- 1. Obtener Métricas Estáticas ---
+        // -------------------------------------------------
+        // 1) Velocidad y aciertos (tabla estadistica)
+        // -------------------------------------------------
         const statsQuery = `
             SELECT 
                 velocidad_lectura,
-                libros_leidos,
-                total_test_completados,
                 porcentaje_aciertos
             FROM estadistica
-            WHERE id_usuario = $1;
+            WHERE id_usuario = $1
+            LIMIT 1;
         `;
         const statsResult = await client.query(statsQuery, [userIdInt]);
-        const stats = statsResult.rows[0] || {};
-        
-        // --- 2. Calcular Racha Dinámica (CORREGIDO) ---
+        const stats = statsResult.rows[0] || { velocidad_lectura: 0, porcentaje_aciertos: 0 };
+
+        // -------------------------------------------------
+        // 2) Libros leídos reales (CORREGIDO: progreso)
+        // -------------------------------------------------
+        const librosQuery = `
+            SELECT COUNT(*) AS libros_leidos
+            FROM progreso
+            WHERE id_perfil = $1 AND estado = 'Completado';
+        `;
+        const librosResult = await client.query(librosQuery, [perfilIdInt]);
+        const librosLeidos = parseInt(librosResult.rows[0].libros_leidos) || 0;
+
+        // -------------------------------------------------
+        // 3) Tests completados reales
+        // -------------------------------------------------
+        const testsQuery = `
+            SELECT COUNT(*) AS test_completados
+            FROM evaluacion
+            WHERE id_perfil = $1;
+        `;
+        const testsResult = await client.query(testsQuery, [perfilIdInt]);
+        const testCompletados = parseInt(testsResult.rows[0].test_completados) || 0;
+
+        // -------------------------------------------------
+        // 4) Racha real desde lecturas_diarias
+        // -------------------------------------------------
         const rachaQuery = `
-            WITH fechas_unicas AS (
-                -- ✅ Corregido: Usar id_perfil
-                SELECT DISTINCT (fecha_actualizacion::date) AS dia 
-                FROM evaluacion
+            WITH fechas AS (
+                SELECT DISTINCT fecha_lectura::date AS dia
+                FROM lecturas_diarias
                 WHERE id_perfil = $1
             ),
-            dias_consecutivos AS (
-                SELECT
-                    dia,
-                    dia - (ROW_NUMBER() OVER (ORDER BY dia DESC) || ' day')::interval AS grupo_racha
-                FROM fechas_unicas
-                ORDER BY dia DESC
-            ),
-            racha_actual AS (
-                SELECT 
-                    COUNT(dia) AS racha_dias
-                FROM dias_consecutivos
-                WHERE grupo_racha = (
-                    SELECT grupo_racha FROM dias_consecutivos ORDER BY dia DESC LIMIT 1
-                )
+            consecutivos AS (
+                SELECT dia,
+                       dia - (ROW_NUMBER() OVER (ORDER BY dia DESC) || ' day')::interval AS grupo
+                FROM fechas
             )
-            SELECT COALESCE(r.racha_dias, 0) AS racha_dias
-            FROM racha_actual r;
+            SELECT COALESCE(MAX(counts), 0) AS racha_dias FROM (
+                SELECT COUNT(*) AS counts
+                FROM consecutivos
+                GROUP BY grupo
+            ) AS sub;
         `;
-        
-        // ✅ Corregido: Pasar id_perfil al query
         const rachaResult = await client.query(rachaQuery, [perfilIdInt]);
-        const racha = rachaResult.rows[0]?.racha_dias || 0;
+        const rachaDias = parseInt(rachaResult.rows[0]?.racha_dias || 0);
+        // -------------------------------------------------
+        // 5) Máximos reales
+        // -------------------------------------------------
+        const totalLibrosQuery = `
+        SELECT COUNT(*) AS total_libros
+        FROM progreso
+        WHERE id_perfil = $1;
+        `;
+        const totalLibrosResult = await client.query(totalLibrosQuery, [perfilIdInt]);
+        const totalLibros = parseInt(totalLibrosResult.rows[0]?.total_libros || 0);
 
+        const totalTestsQuery = `
+            SELECT COALESCE(SUM(total_test), 0) AS total_tests
+            FROM evaluacion
+            WHERE id_perfil = $1;
+        `;
+        const totalTestsResult = await client.query(totalTestsQuery, [perfilIdInt]);
+        const totalTests = parseInt(totalTestsResult.rows[0]?.total_tests || 0);
+
+
+        // -------------------------------------------------
+        // RESPUESTA FINAL → EXACTA para StatsView
+        // -------------------------------------------------
         res.status(200).json({
-            exito: true,
-            estadisticas: {
-                ...stats,
-                racha_dias: parseInt(racha)
-            }
+            velocidad_lectura: stats.velocidad_lectura || 0,
+            porcentaje_aciertos: stats.porcentaje_aciertos || 0,
+            libros_leidos: librosLeidos,
+            total_libros: totalLibros,
+            total_test_completados: testCompletados,
+            total_tests: totalTests,
+            racha_dias: rachaDias
         });
+
 
     } catch (error) {
         console.error("Error al obtener estadísticas generales:", error);

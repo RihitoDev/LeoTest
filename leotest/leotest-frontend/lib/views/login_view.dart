@@ -3,7 +3,7 @@ import 'package:leotest/main.dart';
 import 'package:leotest/views/registration_view.dart';
 import 'package:leotest/services/auth_service.dart';
 import 'package:leotest/services/profile_service.dart';
-import 'package:leotest/views/profile_editor_view.dart';
+import 'package:leotest/views/profile_edit_view.dart';
 
 class LoginView extends StatefulWidget {
   const LoginView({super.key});
@@ -60,9 +60,7 @@ class _LoginViewState extends State<LoginView> {
 
         Navigator.pushReplacement(
           context,
-          MaterialPageRoute(
-            builder: (_) => ProfileEditorView(userId: userIdInt),
-          ),
+          MaterialPageRoute(builder: (_) => ProfileEditView()),
         );
         return;
       }

@@ -38,14 +38,6 @@ class BookProgress {
   });
 
   factory BookProgress.fromJson(Map<String, dynamic> json) {
-    // 🔹 Aseguramos que los números sean int aunque vengan como String
-    int parseInt(dynamic value) {
-      if (value == null) return 0;
-      if (value is int) return value;
-      if (value is String) return int.tryParse(value) ?? 0;
-      return 0;
-    }
-
     return BookProgress(
       idProgreso: json['id_progreso'],
       idLibro: json['id_libro'],
@@ -75,23 +67,29 @@ class ProgressService {
     try {
       final response = await http.get(Uri.parse(url));
 
-      print("🔍 STATUS CODE: ${response.statusCode}");
-      print("📥 RESPONSE BODY: ${response.body}");
-
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
         final List<dynamic> list = data["progreso"] ?? [];
-
-        print("📚 TOTAL ELEMENTOS EN LA LISTA: ${list.length}");
-
         return list.map((item) => BookProgress.fromJson(item)).toList();
       } else {
-        print("❌ ERROR del servidor: ${response.body}");
         return [];
       }
     } catch (e) {
       print('❌ Error de conexión al obtener progreso: $e');
       return [];
     }
+  }
+
+  static Future<int> getReadingStreak(int idPerfil) async {
+    final url = Uri.parse("$_baseUrl/racha/$idPerfil");
+
+    final res = await http.get(url);
+
+    if (res.statusCode == 200) {
+      final data = jsonDecode(res.body);
+      return data["racha"] ?? 0;
+    }
+
+    return 0;
   }
 }

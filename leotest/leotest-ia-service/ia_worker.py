@@ -152,6 +152,33 @@ def _extract_json_from_text(maybe_text: str):
 # -----------------------------
 # GEMINI QUESTION GENERATION
 # -----------------------------
+def _extract_json_from_text(maybe_text: str):
+    """
+    Extrae el primer array JSON de un texto (respuestas del modelo).
+    """
+    try:
+        return json.loads(maybe_text)
+    except Exception:
+        pass
+
+    array_match = re.search(r"(\[.*\])", maybe_text, re.DOTALL)
+    if array_match:
+        try:
+            return json.loads(array_match.group(1))
+        except Exception as e:
+            logging.error(f"Error parseando array JSON: {e}")
+
+    obj_match = re.search(r"(\{.*\})", maybe_text, re.DOTALL)
+    if obj_match:
+        try:
+            return json.loads(obj_match.group(1))
+        except Exception as e:
+            logging.error(f"Error parseando objeto JSON: {e}")
+
+    logging.error("No se pudo extraer JSON de la respuesta de Gemini")
+    return None
+
+
 def generate_questions_from_text(text_fragment: str, id_capitulo: int) -> List[Pregunta]:
     if GEMINI_CLIENT is None:
         logging.error("Gemini client no inicializado.")
@@ -162,24 +189,30 @@ def generate_questions_from_text(text_fragment: str, id_capitulo: int) -> List[P
         return []
 
     prompt = f"""
-RESPONDE SOLO CON UN ARRAY JSON (sin texto adicional).
-Cada elemento debe tener:
-id_capitulo (integer), nivel_comprension (literal|inferencial|critico), 
-enunciado (string), tipo=opcion_multiple, 
-opciones: [{{texto_opcion, opcion_correcta}}]
+    RESPONDE SOLO CON UN ARRAY JSON (sin texto adicional).
+    Cada elemento debe tener:
+    - id_capitulo (integer)
+    - nivel_comprension (literal|inferencial|critico)
+    - enunciado (string)
+    - tipo (opcion_multiple|falso_verdadero)
+    - opciones: [{{texto_opcion, opcion_correcta}}]
 
-Genera exactamente 3 preguntas basadas SOLO en el texto:
-1) literal
-2) inferencial
-3) crítico
+    Genera exactamente 3 preguntas basadas SOLO en el texto:
 
-id_capitulo = {id_capitulo}
+    1) Literal: tipo aleatorio (opcion_multiple o falso_verdadero), mínimo 2 opciones
+    2) Inferencial: tipo opcion_multiple, mínimo 3 opciones
+    3) Crítico: tipo opcion_multiple, mínimo 3 opciones
 
-TEXTO:
----
-{text_fragment}
----
-"""
+    id_capitulo = {id_capitulo}
+
+    TEXTO:
+    {text_fragment}
+
+    IMPORTANTE: 
+    - Devuelve **solo JSON**, sin explicaciones.
+    - Asegúrate de que cada pregunta tenga al menos 2 opciones.
+    - Para falso_verdadero, las opciones deben ser "Verdadero" y "Falso".
+    """
 
     try:
         response = GEMINI_CLIENT.generate_content(
@@ -206,11 +239,25 @@ TEXTO:
         try:
             q["id_capitulo"] = int(id_capitulo)
 
-            if "opciones" in q and isinstance(q["opciones"], list):
-                if any(isinstance(o, str) for o in q["opciones"]):
-                    logging.warning("Opciones vienen como strings, saltando pregunta.")
-                    continue
+            # Validar opciones
+            if "opciones" not in q or not isinstance(q["opciones"], list):
+                logging.warning("Pregunta sin opciones válidas, se omite.")
+                continue
 
+            # Validar tipo falso_verdadero
+            if q.get("tipo") == "falso_verdadero":
+                q["opciones"] = [
+                    {"texto_opcion": "Verdadero", "opcion_correcta": q["opciones"][0].get("opcion_correcta", True)},
+                    {"texto_opcion": "Falso", "opcion_correcta": not q["opciones"][0].get("opcion_correcta", True)}
+                ]
+
+            # Validar número mínimo de opciones
+            min_opts = 2 if q.get("nivel_comprension") == "literal" else 3
+            if len(q["opciones"]) < min_opts:
+                logging.warning(f"Pregunta con menos de {min_opts} opciones, se omite: {q['enunciado']}")
+                continue
+
+            # Parsear Pydantic
             p = Pregunta.parse_obj({
                 "id_capitulo": q["id_capitulo"],
                 "nivel_comprension": q.get("nivel_comprension", "literal"),
@@ -226,7 +273,6 @@ TEXTO:
 
     logging.info(f"Generadas válidas para cap {id_capitulo}: {len(valid_questions)}")
     return valid_questions
-
 
 # -----------------------------
 # HELPERS

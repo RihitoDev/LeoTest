@@ -15,6 +15,9 @@ class UserProfileData {
   final int librosLeidos;
   final double? porcentajeAciertos;
   final String? imagenPerfil; // URL
+  final int? idUsuario;
+  final int? idNivelEducativo;
+
   UserProfileData({
     this.idPerfil,
     required this.nombreUsuario,
@@ -26,6 +29,8 @@ class UserProfileData {
     required this.librosLeidos,
     this.porcentajeAciertos,
     this.imagenPerfil,
+    this.idUsuario,
+    this.idNivelEducativo,
   });
 }
 
@@ -53,8 +58,9 @@ class ProfileService {
               : (p['porcentaje_aciertos'] as num?)?.toDouble();
           return UserProfileData(
             idPerfil: p['id_perfil'] as int?,
-            nombreUsuario:
-                p['nombre_perfil'] ?? p['nombre_usuario'] ?? "Usuario",
+            idUsuario: p['id_usuario'] as int?,
+            idNivelEducativo: p['id_nivel_educativo'],
+            nombreUsuario: p['nombre_usuario'] ?? "Usuario",
             nombrePerfil: p['nombre_perfil'] ?? "Usuario",
             email: SIMULATED_EMAIL,
             edad: p['edad'] ?? 0,
@@ -148,7 +154,9 @@ class ProfileService {
 
           return UserProfileData(
             idPerfil: data['id_perfil'],
-            nombreUsuario: data['nombre_perfil'],
+            idUsuario: data['id_usuario'],
+            idNivelEducativo: data['id_nivel_educativo'],
+            nombreUsuario: data['nombre_usuario'] ?? "Usuario",
             nombrePerfil: data['nombre_perfil'],
             email: SIMULATED_EMAIL,
             edad: data['edad'] ?? 0,
@@ -182,5 +190,44 @@ class ProfileService {
       porcentajeAciertos: 0.0,
       imagenPerfil: null,
     );
+  }
+
+  /// Actualiza perfil por idPerfil (si se pasa profileId)
+  static Future<bool> updateProfile({
+    required int? profileId,
+    required String nombrePerfil,
+    required int edad,
+    required int? idNivelEducativo,
+    required String? imagenPerfilUrl,
+  }) async {
+    try {
+      final body = {
+        "nombre_perfil": nombrePerfil,
+        "edad": edad,
+        "id_nivel_educativo": idNivelEducativo,
+        "imagen_perfil": imagenPerfilUrl,
+      };
+
+      // Si tienes idPerfil (ruta /api/profile/:id)
+      if (profileId != null) {
+        final response = await http.put(
+          Uri.parse("$_baseUrl/$profileId"),
+          headers: {"Content-Type": "application/json"},
+          body: json.encode(body),
+        );
+        return response.statusCode == 200;
+      }
+
+      // fallback: actualizar por userId
+      final response = await http.put(
+        Uri.parse("$_baseUrl/user/${_currentUserId}"),
+        headers: {"Content-Type": "application/json"},
+        body: json.encode(body),
+      );
+      return response.statusCode == 200;
+    } catch (e) {
+      print("updateProfile error: $e");
+      return false;
+    }
   }
 }

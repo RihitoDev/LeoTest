@@ -1,11 +1,14 @@
 // lib/views/profile_view.dart
 import 'package:flutter/material.dart';
+import 'package:leotest/views/evaluation_list_view.dart';
 import 'package:leotest/views/settings_view.dart';
 import 'package:leotest/views/progress_view.dart';
 import 'package:leotest/views/login_view.dart';
 import 'package:leotest/services/auth_service.dart';
 import 'package:leotest/services/profile_service.dart';
+import 'package:leotest/services/my_books_service.dart';
 import 'package:leotest/views/stats_view.dart';
+import '../models/user_book_progress.dart';
 
 class ProfileView extends StatefulWidget {
   final int? profileId;
@@ -16,7 +19,7 @@ class ProfileView extends StatefulWidget {
 }
 
 class _ProfileViewState extends State<ProfileView> {
-  late Future<UserProfileData> _futureProfileData;
+  late Future<Map<String, dynamic>> _futureProfileWithStats;
 
   @override
   void initState() {
@@ -27,16 +30,26 @@ class _ProfileViewState extends State<ProfileView> {
   void _loadProfileData() {
     if (mounted) {
       setState(() {
-        _futureProfileData = ProfileService.fetchProfileData(widget.profileId!);
+        _futureProfileWithStats = _fetchProfileWithStats();
       });
     }
+  }
+
+  /// ⚡ Trae perfil + libros leídos reales
+  Future<Map<String, dynamic>> _fetchProfileWithStats() async {
+    final profile = await ProfileService.fetchProfileData(widget.profileId);
+    final books = await MyBooksService.getUserBooks(profile.idPerfil!);
+    final librosLeidos = books.where((b) => b.estado == 'Completado').length;
+
+    return {'profile': profile, 'librosLeidos': librosLeidos};
   }
 
   // --- WIDGETS AUXILIARES ---
   Widget _buildAvatarSection(
     BuildContext context,
     Color primaryColor,
-    UserProfileData profile,
+    dynamic profile,
+    int librosLeidos,
   ) {
     return Column(
       children: [
@@ -67,17 +80,12 @@ class _ProfileViewState extends State<ProfileView> {
             color: Colors.white,
           ),
         ),
-        const SizedBox(height: 5),
-        Text(
-          profile.email,
-          style: const TextStyle(fontSize: 14, color: Colors.grey),
-        ),
         const SizedBox(height: 15),
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceEvenly,
           children: [
-            _buildStatItem('Libros Leídos', profile.librosLeidos.toString()),
-            _buildStatItem('Racha', '${profile.rachaDias} días'),
+            _buildStatItem('Libros Leídos', librosLeidos.toString()),
+            _buildStatItem('Edad', profile.edad?.toString() ?? '-'),
             _buildStatItem('Nivel', profile.nivelEducativo),
           ],
         ),
@@ -109,7 +117,7 @@ class _ProfileViewState extends State<ProfileView> {
     Color primaryColor, {
     bool isLogout = false,
     VoidCallback? onTapAction,
-    UserProfileData? profile,
+    dynamic profile,
   }) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8.0),
@@ -154,10 +162,13 @@ class _ProfileViewState extends State<ProfileView> {
                     MaterialPageRoute(builder: (context) => const LoginView()),
                     (route) => false,
                   );
-                } else if (title == 'Editar Datos y Preferencias') {
+                } else if (title == 'Editar Datos de Cuenta') {
                   Navigator.push(
                     context,
-                    MaterialPageRoute(builder: (context) => SettingsView()),
+                    MaterialPageRoute(
+                      builder: (context) =>
+                          SettingsView(profileId: widget.profileId),
+                    ),
                   ).then((_) => _loadProfileData());
                 } else if (title == 'Progreso') {
                   Navigator.push(
@@ -191,8 +202,8 @@ class _ProfileViewState extends State<ProfileView> {
         elevation: 0,
         iconTheme: const IconThemeData(color: Colors.white),
       ),
-      body: FutureBuilder<UserProfileData>(
-        future: _futureProfileData,
+      body: FutureBuilder<Map<String, dynamic>>(
+        future: _futureProfileWithStats,
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
             return Center(
@@ -223,14 +234,20 @@ class _ProfileViewState extends State<ProfileView> {
             );
           }
 
-          final profile = snapshot.data!;
+          final profile = snapshot.data!['profile'];
+          final librosLeidos = snapshot.data!['librosLeidos'];
 
           return SingleChildScrollView(
             padding: const EdgeInsets.all(20),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.center,
               children: [
-                _buildAvatarSection(context, primaryColor, profile),
+                _buildAvatarSection(
+                  context,
+                  primaryColor,
+                  profile,
+                  librosLeidos,
+                ),
                 const SizedBox(height: 30),
                 _buildProfileOption(
                   context,
@@ -246,18 +263,20 @@ class _ProfileViewState extends State<ProfileView> {
                   Icons.checklist,
                   cardColor,
                   primaryColor,
+                  onTapAction: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) =>
+                            EvaluationListView(idPerfil: profile.idPerfil!),
+                      ),
+                    );
+                  },
                 ),
                 _buildProfileOption(
                   context,
                   'Estadísticas',
                   Icons.bar_chart,
-                  cardColor,
-                  primaryColor,
-                ),
-                _buildProfileOption(
-                  context,
-                  'Social',
-                  Icons.people_outline,
                   cardColor,
                   primaryColor,
                 ),
@@ -275,18 +294,12 @@ class _ProfileViewState extends State<ProfileView> {
                 const SizedBox(height: 10),
                 _buildProfileOption(
                   context,
-                  'Editar Datos y Preferencias',
+                  'Editar Datos de Cuenta',
                   Icons.settings,
                   cardColor,
                   primaryColor,
                 ),
-                _buildProfileOption(
-                  context,
-                  'Privacidad',
-                  Icons.lock_outline,
-                  cardColor,
-                  primaryColor,
-                ),
+
                 _buildProfileOption(
                   context,
                   'Cerrar Sesión',

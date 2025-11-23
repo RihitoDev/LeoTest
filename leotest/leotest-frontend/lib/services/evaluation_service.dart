@@ -56,6 +56,7 @@ class EvaluationService {
     required int idLibro,
     required int idPerfil,
     required List<Map<String, dynamic>> respuestas,
+    required int minutosLeidos,
   }) async {
     final url = Uri.parse(
       '$baseUrl/evaluacion/libro/$idLibro/perfil/$idPerfil/enviar',
@@ -64,8 +65,28 @@ class EvaluationService {
       final resp = await http.post(
         url,
         headers: {"Content-Type": "application/json"},
-        body: jsonEncode({"respuestas": respuestas}),
+        body: jsonEncode({
+          "respuestas": respuestas,
+          "minutosLeidos": minutosLeidos, // 🔹 agregado
+        }),
       );
+      if (resp.statusCode == 200) {
+        return {"success": true, "data": jsonDecode(resp.body)};
+      } else {
+        return {"success": false, "message": resp.body};
+      }
+    } catch (e) {
+      return {"success": false, "message": e.toString()};
+    }
+  }
+
+  /// Obtiene todas las evaluaciones hechas por un perfil
+  static Future<Map<String, dynamic>> fetchEvaluacionesPerfil(
+    int idPerfil,
+  ) async {
+    final url = Uri.parse('$baseUrl/evaluacion/perfil/$idPerfil');
+    try {
+      final resp = await http.get(url);
       if (resp.statusCode == 200) {
         return {"success": true, "data": jsonDecode(resp.body)};
       } else {
