@@ -1,264 +1,317 @@
 # leotest-ia-service/ia_worker.py
-
 from pydantic import BaseModel
-from typing import List, Optional, Dict
+from typing import List, Dict
 import requests
 import time
 import json
-import os 
+import os
 import logging
-from google import genai
-from google.genai import types
-import io 
-import pdfplumber 
+import google.generativeai as genai
+import io
+import pdfplumber
+import re
 
-# Configuración de Logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
-# URL INTERNA de Node.js para guardar los resultados
-INTERNAL_NODE_API_URL = os.environ.get("INTERNAL_NODE_API_URL", "http://localhost:3000/api") 
+INTERNAL_NODE_API_URL = os.environ.get("INTERNAL_NODE_API_URL", "http://localhost:3000/api")
 INTERNAL_SAVE_QUESTIONS_URL = f"{INTERNAL_NODE_API_URL}/ia/save_generated"
 INTERNAL_CHAPTER_API_URL = f"{INTERNAL_NODE_API_URL}/libros/internal/chapter"
+GEMINI_MODEL = os.environ.get("GEMINI_MODEL", "gemini-2.5-flash")
+GEMINI_CLIENT = None
 
-# --- Inicialización del Cliente Gemini ---
-GEMINI_MODEL = 'gemini-2.5-flash'
-GEMINI_CLIENT = None 
 
-# --- Modelos de Datos ---
-
+# -----------------------------
+# MODELOS
+# -----------------------------
 class Option(BaseModel):
     texto_opcion: str
     opcion_correcta: bool
 
+
 class Pregunta(BaseModel):
-    id_capitulo: int 
-    nivel_comprension: str  
+    id_capitulo: int
+    nivel_comprension: str
     enunciado: str
-    tipo: str  
+    tipo: str
     opciones: List[Option]
-    
+
+
 class BookProcessingInput(BaseModel):
     id_libro: int
-    ruta_archivo: str 
+    ruta_archivo: str
     total_capitulos: int
 
-# --- Lógica de Inicialización (Llamada desde main.py) ---
+
+# -----------------------------
+# GEMINI CLIENT
+# -----------------------------
 def initialize_gemini_client():
-    """Inicializa el cliente de Gemini y lo almacena globalmente."""
     global GEMINI_CLIENT
+    api_key = os.getenv("GEMINI_API_KEY")
+    if not api_key:
+        logging.error("No se encontró GEMINI_API_KEY en variables de entorno")
+        return None
+
     try:
-        # La SDK busca la clave en os.environ['GEMINI_API_KEY']
-        GEMINI_CLIENT = genai.Client()
+        genai.configure(api_key=api_key)
+        # Crear modelo correctamente
+        GEMINI_CLIENT = genai.GenerativeModel(GEMINI_MODEL)
+        logging.info("✅ Cliente Gemini inicializado correctamente")
         return GEMINI_CLIENT
+
     except Exception as e:
         logging.error(f"❌ Fallo al inicializar el cliente Gemini: {e}")
         return None
 
-# --- Lógica Auxiliar de Extracción Dinámica ---
 
+# -----------------------------
+# PDF PROCESSING
+# -----------------------------
 def extract_text_from_pdf_url(pdf_url: str) -> str:
-    """
-    Descarga el PDF de la URL y extrae todo el texto plano.
-    """
     logging.info(f"Iniciando descarga y extracción del PDF desde: {pdf_url}")
-    try:
-        pdf_response = requests.get(pdf_url)
-        pdf_response.raise_for_status() 
-        
-        pdf_file = io.BytesIO(pdf_response.content)
-        
-        full_text = ""
-        with pdfplumber.open(pdf_file) as pdf:
-            for page in pdf.pages:
-                text = page.extract_text()
-                if text:
-                    full_text += text + "\n\n"
-        
-        if not full_text.strip():
-            raise ValueError("El PDF no contiene texto extraíble.")
-            
-        logging.info("✅ Extracción de texto del PDF completada.")
-        return full_text
-        
-    except requests.exceptions.RequestException as e:
-        logging.error(f"Error de red/HTTP al descargar PDF: {e}")
-        raise
-    except Exception as e:
-        logging.error(f"Error durante la extracción de texto con pdfplumber: {e}")
-        raise
+    resp = requests.get(pdf_url, timeout=60)
+    resp.raise_for_status()
+    pdf_file = io.BytesIO(resp.content)
+
+    full_text = ""
+    with pdfplumber.open(pdf_file) as pdf:
+        for page in pdf.pages:
+            text = page.extract_text()
+            if text:
+                full_text += text + "\n\n"
+
+    if not full_text.strip():
+        raise ValueError("El PDF no contiene texto extraíble.")
+
+    logging.info("✅ Extracción de texto completada.")
+    return full_text
 
 
-def divide_text_into_chapters(full_text: str, num_chapters: int) -> Dict[int, str]:
-    """
-    Divide el texto plano en el número de capítulos especificado (división por longitud).
-    """
+# -----------------------------
+# CHAPTER SPLIT
+# -----------------------------
+def simple_split_by_length(full_text: str, num_chapters: int) -> Dict[int, str]:
     text_length = len(full_text)
-    
     if num_chapters <= 0 or text_length == 0:
         return {}
-    
+
     chunk_size = text_length // num_chapters
     chapters_content = {}
-    
+
     for i in range(num_chapters):
         start = i * chunk_size
         end = (i + 1) * chunk_size if i < num_chapters - 1 else text_length
-        
-        # Asignamos el índice i+1 al número de capítulo
         chapters_content[i + 1] = full_text[start:end].strip()
 
     return chapters_content
 
 
-# --- Lógica Funcional de Generación de Preguntas Específicas ---
+def divide_text_into_chapters(full_text: str, num_chapters: int) -> Dict[int, str]:
+    chapter_pattern = r"(?:^|\n)(?:Cap[ií]tulo\s+\d+|CAP[IÍ]TULO\s+\d+|Cap\.?\s*\d+|[IVXLCDM]+\s*\n)"
 
+    matches = list(re.finditer(chapter_pattern, full_text, re.IGNORECASE))
+
+    if not matches:
+        return simple_split_by_length(full_text, num_chapters)
+
+    chapters = {}
+    for i in range(len(matches)):
+        start = matches[i].start()
+        end = matches[i + 1].start() if i < len(matches) - 1 else len(full_text)
+        chapters[i + 1] = full_text[start:end].strip()
+
+    return chapters
+
+
+# -----------------------------
+# JSON PARSER HELP
+# -----------------------------
+def _extract_json_from_text(maybe_text: str):
+    try:
+        return json.loads(maybe_text)
+    except Exception:
+        pass
+
+    array_match = re.search(r"(\[.*\])", maybe_text, re.DOTALL)
+    if array_match:
+        try:
+            return json.loads(array_match.group(1))
+        except Exception:
+            pass
+
+    obj_match = re.search(r"(\{.*\})", maybe_text, re.DOTALL)
+    if obj_match:
+        try:
+            return json.loads(obj_match.group(1))
+        except Exception:
+            pass
+
+    return None
+
+
+# -----------------------------
+# GEMINI QUESTION GENERATION
+# -----------------------------
 def generate_questions_from_text(text_fragment: str, id_capitulo: int) -> List[Pregunta]:
-    """ Genera preguntas específicas del texto utilizando Gemini. """
-    
     if GEMINI_CLIENT is None:
+        logging.error("Gemini client no inicializado.")
         return []
 
-    # 1. Definición del Esquema JSON
-    json_schema = types.Schema(
-        type=types.Type.ARRAY,
-        items=types.Schema(
-            type=types.Type.OBJECT,
-            properties={
-                "id_capitulo": types.Schema(type=types.Type.INTEGER, description=f"ID del capítulo: {id_capitulo}"),
-                "nivel_comprension": types.Schema(type=types.Type.STRING, enum=["literal", "inferencial", "critico"]),
-                "enunciado": types.Schema(type=types.Type.STRING),
-                "tipo": types.Schema(type=types.Type.STRING, enum=["opcion_multiple"]),
-                "opciones": types.Schema(
-                    type=types.Type.ARRAY,
-                    items=types.Schema(
-                        type=types.Type.OBJECT,
-                        properties={
-                            "texto_opcion": types.Schema(type=types.Type.STRING),
-                            "opcion_correcta": types.Schema(type=types.Type.BOOLEAN),
-                        },
-                        required=["texto_opcion", "opcion_correcta"],
-                    )
-                )
-            },
-            required=["id_capitulo", "nivel_comprension", "enunciado", "tipo", "opciones"],
-        )
-    )
+    if not text_fragment.strip():
+        logging.warning(f"Capítulo {id_capitulo} vacío.")
+        return []
 
-    # 2. Instrucción detallada para el LLM
     prompt = f"""
-    Genera exactamente 3 preguntas de opción múltiple basadas ÚNICAMENTE en el TEXTO proporcionado:
-    1. Una pregunta LITERAL (hechos directos).
-    2. Una pregunta INFERENCIAL (deducción).
-    3. Una pregunta CRÍTICA (juicio/opinión sobre el tema).
-    Asegúrate de que la respuesta correcta esté marcada con 'opcion_correcta: true' y proporciona dos distractores lógicos.
-    El campo 'id_capitulo' debe ser siempre {id_capitulo}.
-    
-    TEXTO DEL CAPÍTULO A EVALUAR:
-    ---
-    {text_fragment}
-    ---
-    """
-    
-    try:
-        response = GEMINI_CLIENT.models.generate_content(
-            model=GEMINI_MODEL,
-            contents=prompt,
-            config=types.GenerateContentConfig(
-                response_mime_type="application/json",
-                response_schema=json_schema,
-                temperature=0.6 
-            ),
-        )
+RESPONDE SOLO CON UN ARRAY JSON (sin texto adicional).
+Cada elemento debe tener:
+id_capitulo (integer), nivel_comprension (literal|inferencial|critico), 
+enunciado (string), tipo=opcion_multiple, 
+opciones: [{{texto_opcion, opcion_correcta}}]
 
-        questions_data = json.loads(response.text)
-        
-        valid_questions: List[Pregunta] = []
-        for q_dict in questions_data:
-            valid_questions.append(Pregunta.parse_obj(q_dict)) 
-                
-        return valid_questions
+Genera exactamente 3 preguntas basadas SOLO en el texto:
+1) literal
+2) inferencial
+3) crítico
+
+id_capitulo = {id_capitulo}
+
+TEXTO:
+---
+{text_fragment}
+---
+"""
+
+    try:
+        response = GEMINI_CLIENT.generate_content(
+            prompt,
+            generation_config={"temperature": 0.4},
+        )
+        raw = response.text or ""
 
     except Exception as e:
-        logging.error(f"Error en la llamada a la API de Gemini: {e}")
+        logging.error(f"Error al llamar Gemini: {e}")
         return []
 
+    logging.info(f"Respuesta cruda Gemini (len {len(raw)}): {raw[:2000]}")
 
+    parsed = _extract_json_from_text(raw)
+    if parsed is None:
+        logging.error("No JSON extraído de Gemini.")
+        return []
+
+    questions_list = parsed if isinstance(parsed, list) else parsed.get("questions", [])
+    valid_questions = []
+
+    for q in questions_list:
+        try:
+            q["id_capitulo"] = int(id_capitulo)
+
+            if "opciones" in q and isinstance(q["opciones"], list):
+                if any(isinstance(o, str) for o in q["opciones"]):
+                    logging.warning("Opciones vienen como strings, saltando pregunta.")
+                    continue
+
+            p = Pregunta.parse_obj({
+                "id_capitulo": q["id_capitulo"],
+                "nivel_comprension": q.get("nivel_comprension", "literal"),
+                "enunciado": q["enunciado"],
+                "tipo": q.get("tipo", "opcion_multiple"),
+                "opciones": q["opciones"]
+            })
+
+            valid_questions.append(p)
+
+        except Exception as e:
+            logging.error(f"Error validando pregunta: {e}. Datos: {q}")
+
+    logging.info(f"Generadas válidas para cap {id_capitulo}: {len(valid_questions)}")
+    return valid_questions
+
+
+# -----------------------------
+# HELPERS
+# -----------------------------
+def generate_for_chapter(id_capitulo: int, contenido_texto: str):
+    preguntas = generate_questions_from_text(contenido_texto, id_capitulo)
+    return [p.dict() for p in preguntas]
+
+
+# -----------------------------
+# MAIN BOOK PROCESSOR
+# -----------------------------
 def process_full_book(input_data: BookProcessingInput):
-    """ 
-    Worker funcional: Flujo asíncrono que maneja la persistencia y la generación de preguntas.
-    """
-    logging.info(f"Iniciando procesamiento de libro ID: {input_data.id_libro} con {input_data.total_capitulos} capítulos.")
-    
-    try:
-        # 1. PASO DINÁMICO: DESCARGA Y EXTRACCIÓN DEL PDF
-        full_text = extract_text_from_pdf_url(input_data.ruta_archivo)
-        
-        # 2. DIVIDIR EL TEXTO EN FRAGMENTOS DE CAPÍTULOS
-        chapters_content = divide_text_into_chapters(full_text, input_data.total_capitulos)
-        
-        if not chapters_content:
-             logging.error("No se pudo dividir el texto en capítulos válidos.")
-             return {"success": False, "error": "No hay contenido para procesar."}
+    logging.info(f"Iniciando procesamiento libro {input_data.id_libro}")
 
-        all_questions_generated: List[Pregunta] = []
-        
-        # 3. BUCLE DE PROCESAMIENTO Y PERSISTENCIA POR CAPÍTULO
-        for chapter_num, fragment in chapters_content.items():
-            
+    try:
+        full_text = extract_text_from_pdf_url(input_data.ruta_archivo)
+        chapters = divide_text_into_chapters(full_text, input_data.total_capitulos)
+
+        if not chapters:
+            logging.error("No chapters found.")
+            return {"success": False, "error": "No content"}
+
+        total_saved = 0
+
+        for chapter_num, fragment in chapters.items():
             chapter_title = f"Capítulo {chapter_num}"
-            
-            # 3a. INSERTAR CAPÍTULO EN NODE.JS Y OBTENER EL ID_PK
+            logging.info(f"Procesando {chapter_title}...")
+
             chapter_payload = {
                 "id_libro": input_data.id_libro,
                 "numero_capitulo": chapter_num,
                 "titulo_capitulo": chapter_title,
-                "contenido_texto": fragment # Contenido de texto para capitulo_embedding
+                "contenido_texto": fragment
             }
 
-            chapter_response = requests.post(
-                INTERNAL_CHAPTER_API_URL, 
-                headers={"Content-Type": "application/json"},
-                data=json.dumps(chapter_payload)
-            )
+            # Insertar capítulo en Node
+            try:
+                resp = requests.post(INTERNAL_CHAPTER_API_URL, json=chapter_payload, timeout=30)
+            except Exception as e:
+                logging.error(f"Error insert chapter: {e}")
+                continue
 
-            if chapter_response.status_code != 201:
-                logging.error(f"Fallo al insertar Capítulo {chapter_num}. Status: {chapter_response.status_code}. Respuesta: {chapter_response.text}")
-                return {"success": False, "error": f"Fallo al crear capítulo en Node.js."}
-                
-            id_capitulo_pk = chapter_response.json().get("id_capitulo")
-            
-            if id_capitulo_pk is None:
-                logging.error("Node.js no devolvió ID de capítulo.")
-                return {"success": False, "error": "Node.js no devolvió ID de capítulo."}
+            if resp.status_code != 201:
+                logging.error(f"Chapter insert failed: {resp.status_code} {resp.text}")
+                continue
 
-            # 3b. Generación de preguntas (usa el ID_PK real)
-            questions = generate_questions_from_text(fragment, id_capitulo_pk) 
-            all_questions_generated.extend(questions)
-            
-            time.sleep(0.5) 
-            
-        logging.info(f"Total de {len(all_questions_generated)} preguntas generadas en total.")
-        
-        # 4. GUARDAR RESULTADOS FINALES DE VUELTA EN NODE.JS
-        
-        save_response = requests.post(
-            INTERNAL_SAVE_QUESTIONS_URL,
-            headers={"Content-Type": "application/json"},
-            data=json.dumps({
+            id_capitulo_pk = resp.json().get("id_capitulo")
+            if not id_capitulo_pk:
+                logging.error("Node no devolvió id_capitulo")
+                continue
+
+            # Generar preguntas
+            preguntas = generate_questions_from_text(fragment, id_capitulo_pk)
+            if not preguntas:
+                logging.warning("No preguntas generadas para cap " + str(id_capitulo_pk))
+                continue
+
+            payload_save = {
                 "id_libro": input_data.id_libro,
-                "preguntas": [q.dict() for q in all_questions_generated]
-            })
-        )
-        
-        if save_response.status_code == 201:
-            logging.info(f"✅ Persistencia de preguntas exitosa.")
-            return {"success": True}
-        else:
-            logging.error(f"❌ Error al guardar preguntas en Node.js ({save_response.status_code}): {save_response.text}")
-            return {"success": False, "error": f"Fallo al persistir: {save_response.text}"}
+                "preguntas": [p.dict() for p in preguntas]
+            }
+
+            # Guardar preguntas
+            try:
+                save_resp = requests.post(INTERNAL_SAVE_QUESTIONS_URL, json=payload_save, timeout=30)
+            except Exception as e:
+                logging.error(f"Error al guardar preguntas: {e}")
+                continue
+
+            if save_resp.status_code == 201:
+                total_saved += len(preguntas)
+                logging.info(f"Preguntas cap {id_capitulo_pk} guardadas: {len(preguntas)}")
+            else:
+                logging.error(f"Error guardando preguntas {save_resp.status_code}: {save_resp.text}")
+
+            time.sleep(0.5)
+
+        logging.info(f"Total guardadas: {total_saved}")
+        return {"success": True, "total_saved": total_saved}
 
     except Exception as e:
-        logging.error(f"❌ Error fatal en el worker: {e}", exc_info=True)
+        logging.exception("Error fatal worker")
         return {"success": False, "error": str(e)}
+
+
 
 # NOTA: Debes correr este worker a través de uvicorn main:app --reload --host 0.0.0.0 --port 8000

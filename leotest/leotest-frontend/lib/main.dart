@@ -1,14 +1,15 @@
-// lib/main.dart
-
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter/material.dart';
+
+// Vistas
 import 'package:leotest/views/home_view.dart';
 import 'package:leotest/views/profile_view.dart';
-import 'package:leotest/widgets/add_book_modal.dart';
 import 'package:leotest/views/login_view.dart';
 import 'package:leotest/views/my_books_view.dart';
-// ✅ 1. IMPORTAR LA NUEVA VISTA DE MISIONES
 import 'package:leotest/views/missions_view.dart';
+
+// Widgets
+import 'package:leotest/widgets/add_book_modal.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -28,7 +29,6 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // ... (Código del ThemeData sin cambios) ...
     const Color accentColor = Color.fromARGB(255, 255, 166, 0);
     const Color darkBackground = Color.fromARGB(255, 3, 0, 12);
 
@@ -60,11 +60,15 @@ class MyApp extends StatelessWidget {
   }
 }
 
-// ----------------------------------------------------------------------
+// ===========================================================
+// MAIN SCREEN
+// ===========================================================
 
 class MainScreen extends StatefulWidget {
   final int initialIndex;
-  const MainScreen({super.key, this.initialIndex = 0});
+  final int? profileId;
+
+  const MainScreen({super.key, this.initialIndex = 0, this.profileId});
 
   @override
   State<MainScreen> createState() => _MainScreenState();
@@ -73,24 +77,24 @@ class MainScreen extends StatefulWidget {
 class _MainScreenState extends State<MainScreen> {
   int _selectedViewIndex = 0;
 
-  // Vistas disponibles
-  static const List<Widget> _widgetOptions = <Widget>[
-    HomeView(),
-    MyBooksView(),
-    // ✅ 2. MODIFICADO: Reemplazar el placeholder de Amigos por MissionsView()
-    MissionsView(),
-    ProfileView(),
-  ];
-
   @override
   void initState() {
     super.initState();
     _selectedViewIndex = widget.initialIndex;
   }
 
-  // Muestra el modal para agregar un libro
+  /// Lista de Vistas
+  List<Widget> _buildWidgetOptions(int? profileId) {
+    return <Widget>[
+      HomeView(profileId: profileId),
+      MyBooksView(profileId: profileId),
+      MissionsView(profileId: profileId),
+      ProfileView(profileId: profileId),
+    ];
+  }
+
+  /// Modal para agregar libros
   void _showAddBookModal() {
-    // ... (Código del modal sin cambios) ...
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -104,49 +108,53 @@ class _MainScreenState extends State<MainScreen> {
     );
   }
 
-  // Maneja los clics del BottomNavigationBar
+  /// Manejo del BottomNavigationBar
   void _onItemTapped(int navbarIndex) {
-    // ... (Código de _onItemTapped sin cambios) ...
     if (navbarIndex == 2) {
-      _showAddBookModal(); // Botón central "Agregar"
-    } else {
-      setState(() {
-        if (navbarIndex < 2) {
-          _selectedViewIndex = navbarIndex;
-        } else {
-          _selectedViewIndex = navbarIndex - 1;
-        }
-      });
+      _showAddBookModal();
+      return;
     }
+
+    setState(() {
+      if (navbarIndex < 2) {
+        _selectedViewIndex = navbarIndex;
+      } else {
+        _selectedViewIndex = navbarIndex - 1;
+      }
+    });
   }
 
   @override
   Widget build(BuildContext context) {
-    int currentNavbarIndex;
-    if (_selectedViewIndex < 2) {
-      currentNavbarIndex = _selectedViewIndex;
-    } else {
-      currentNavbarIndex = _selectedViewIndex + 1;
-    }
+    final widgetOptions = _buildWidgetOptions(widget.profileId);
+
+    int currentNavbarIndex = _selectedViewIndex < 2
+        ? _selectedViewIndex
+        : _selectedViewIndex + 1;
 
     final primaryColor = Theme.of(context).colorScheme.primary;
 
     return Scaffold(
-      body: Center(child: _widgetOptions.elementAt(_selectedViewIndex)),
+      body: Center(child: widgetOptions.elementAt(_selectedViewIndex)),
+
       bottomNavigationBar: BottomNavigationBar(
         type: BottomNavigationBarType.fixed,
         backgroundColor: const Color.fromARGB(255, 0, 4, 8),
         selectedItemColor: primaryColor,
         unselectedItemColor: Colors.grey[700],
+        currentIndex: currentNavbarIndex,
+        onTap: _onItemTapped,
+
         items: <BottomNavigationBarItem>[
-          // ... (Item 'Inicio' sin cambios) ...
+          /// Inicio
           BottomNavigationBarItem(
             icon: Icon(
               currentNavbarIndex == 0 ? Icons.home : Icons.home_outlined,
             ),
             label: 'Inicio',
           ),
-          // ... (Item 'Mis Libros' sin cambios) ...
+
+          /// Mis Libros
           BottomNavigationBarItem(
             icon: Icon(
               currentNavbarIndex == 1
@@ -155,7 +163,8 @@ class _MainScreenState extends State<MainScreen> {
             ),
             label: 'Mis Libros',
           ),
-          // ... (Item 'Agregar' sin cambios) ...
+
+          /// Agregar
           BottomNavigationBarItem(
             icon: Container(
               padding: const EdgeInsets.all(4.0),
@@ -174,17 +183,17 @@ class _MainScreenState extends State<MainScreen> {
             label: 'Agregar',
           ),
 
-          // ✅ 3. MODIFICADO: Cambiar 'Amigos' por 'Misiones'
+          /// Misiones (nuevo)
           BottomNavigationBarItem(
             icon: Icon(
               currentNavbarIndex == 3
-                  ? Icons.task_alt // Icono para 'Misiones'
+                  ? Icons.task_alt
                   : Icons.task_alt_outlined,
             ),
-            label: 'Misiones', // Etiqueta 'Misiones'
+            label: 'Misiones',
           ),
 
-          // ... (Item 'Perfil' sin cambios) ...
+          /// Perfil
           BottomNavigationBarItem(
             icon: Icon(
               currentNavbarIndex == 4 ? Icons.person : Icons.person_outline,
@@ -192,8 +201,6 @@ class _MainScreenState extends State<MainScreen> {
             label: 'Perfil',
           ),
         ],
-        currentIndex: currentNavbarIndex,
-        onTap: _onItemTapped,
       ),
     );
   }

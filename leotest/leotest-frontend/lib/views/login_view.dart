@@ -1,11 +1,10 @@
 import 'package:flutter/material.dart';
-import 'package:leotest/main.dart'; // Asumiendo que MainScreen está aquí o es una vista clave
+import 'package:leotest/main.dart';
 import 'package:leotest/views/registration_view.dart';
-import 'package:leotest/services/auth_service.dart'; // <-- Servicio de autenticación
-import 'package:leotest/views/admin_home_view.dart'; // <-- Vista de administrador
-import 'package:leotest/views/home_view.dart'; // <-- Vista de usuario estándar
+import 'package:leotest/services/auth_service.dart';
+import 'package:leotest/services/profile_service.dart';
+import 'package:leotest/views/profile_editor_view.dart';
 
-// 1. Convertir a StatefulWidget para manejar el estado y la lógica de login
 class LoginView extends StatefulWidget {
   const LoginView({super.key});
 
@@ -14,11 +13,9 @@ class LoginView extends StatefulWidget {
 }
 
 class _LoginViewState extends State<LoginView> {
-  // Controladores de texto para capturar la entrada del usuario
   final TextEditingController _usernameController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
-  
-  // Estado para el indicador de carga
+
   bool _isLoading = false;
 
   @override
@@ -28,66 +25,85 @@ class _LoginViewState extends State<LoginView> {
     super.dispose();
   }
 
-  // 2. Lógica de Login y Navegación por Roles
+  // ================================================================
+  // LÓGICA DE LOGIN
+  // ================================================================
   Future<void> _handleLogin() async {
-    // Validaciones básicas (puedes añadir más si usas Form y GlobalKey)
     if (_usernameController.text.isEmpty || _passwordController.text.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Por favor, ingresa usuario y contraseña.')),
+        const SnackBar(
+          content: Text('Por favor, ingresa usuario y contraseña.'),
+        ),
       );
       return;
     }
-    
-    setState(() {
-      _isLoading = true;
-    });
 
-    // Llamar al servicio de autenticación
+    setState(() => _isLoading = true);
+
     final result = await AuthService.login(
       _usernameController.text,
       _passwordController.text,
     );
 
-    setState(() {
-      _isLoading = false;
-    });
+    setState(() => _isLoading = false);
 
     if (result.success) {
-      Widget targetView;
-      
-      // La API devuelve "administrador" o "usuario" (se compara en minúsculas por seguridad)
-      if (result.role?.toLowerCase() == 'administrador') {
-        targetView = const AdminHomeView();
-      } else {
-        // Asumiendo que MainScreen es la vista principal del usuario normal, 
-        // o si HomeView es la vista principal. Usa la que corresponda a tu estructura.
-        // Si MainScreen es un wrapper con BottomNavigationBar, úsalo. Si HomeView es el contenido, úsalo.
-        targetView = const MainScreen(); 
+      // OBTENER USER ID REAL
+      final String userIdStr = result.userId ?? AuthService.getCurrentUserId();
+
+      // Buscar si el usuario ya tiene perfil
+      final profile = await ProfileService.fetchProfileForUser(userIdStr);
+
+      if (profile == null) {
+        // No tiene perfil -> Enviar al creador de perfil
+        final int userIdInt = int.tryParse(userIdStr) ?? 0;
+
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (_) => ProfileEditorView(userId: userIdInt),
+          ),
+        );
+        return;
       }
 
-      // Navegar y eliminar todas las rutas anteriores
+      // Sí tiene perfil → Enviar al MainScreen
+      final int? idPerfil = profile.idPerfil;
+
       Navigator.of(context).pushAndRemoveUntil(
-        MaterialPageRoute(builder: (context) => targetView),
+        MaterialPageRoute(
+          builder: (context) =>
+              MainScreen(initialIndex: 0, profileId: idPerfil),
+        ),
         (Route<dynamic> route) => false,
       );
     } else {
-      // Mostrar mensaje de error del API
+      // Error de autenticación
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(result.errorMessage ?? 'Error de autenticación desconocido.'),
+          content: Text(
+            result.errorMessage ?? 'Error de autenticación desconocido.',
+          ),
           backgroundColor: Colors.red,
         ),
       );
     }
   }
-  
-  // 3. Modificación del Widget _buildInputField para usar Controllers
+
+  // ================================================================
+  // INPUT FIELD REUTILIZABLE
+  // ================================================================
   Widget _buildInputField(
-    BuildContext context, 
-    {required String label, required IconData icon, required Color cardColor, bool obscureText = false, required TextEditingController controller, TextInputType keyboardType = TextInputType.text}
-  ) {
+    BuildContext context, {
+    required String label,
+    required IconData icon,
+    required Color cardColor,
+    bool obscureText = false,
+    required TextEditingController controller,
+    TextInputType keyboardType = TextInputType.text,
+  }) {
     return TextFormField(
-      controller: controller, // <-- Asignar el controlador
+      controller: controller,
       style: const TextStyle(color: Colors.white),
       obscureText: obscureText,
       keyboardType: keyboardType,
@@ -96,24 +112,30 @@ class _LoginViewState extends State<LoginView> {
         labelText: label,
         labelStyle: const TextStyle(color: Colors.grey),
         prefixIcon: Icon(icon, color: Colors.grey),
-        fillColor: cardColor,
         filled: true,
+        fillColor: cardColor,
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(10),
           borderSide: BorderSide.none,
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(10),
-          borderSide: BorderSide(color: Theme.of(context).colorScheme.primary, width: 2.0),
+          borderSide: BorderSide(
+            color: Theme.of(context).colorScheme.primary,
+            width: 2.0,
+          ),
         ),
       ),
     );
   }
 
+  // ================================================================
+  // UI
+  // ================================================================
   @override
   Widget build(BuildContext context) {
     final primaryColor = Theme.of(context).colorScheme.primary;
-    final cardColor = Theme.of(context).colorScheme.surface; 
+    final cardColor = Theme.of(context).colorScheme.surface;
 
     return Scaffold(
       body: Center(
@@ -123,12 +145,7 @@ class _LoginViewState extends State<LoginView> {
             mainAxisAlignment: MainAxisAlignment.center,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              // --- 1. Logo o Título de la Aplicación ---
-              Icon(
-                Icons.menu_book_rounded,
-                size: 100,
-                color: primaryColor,
-              ),
+              Icon(Icons.menu_book_rounded, size: 100, color: primaryColor),
               const SizedBox(height: 10),
               const Text(
                 'LeoTest',
@@ -141,33 +158,35 @@ class _LoginViewState extends State<LoginView> {
               ),
               const SizedBox(height: 50),
 
-              // --- 2. Campo de Correo Electrónico/Usuario ---
+              // Usuario
               _buildInputField(
-                context, 
+                context,
                 label: 'Usuario',
                 icon: Icons.person,
                 cardColor: cardColor,
-                controller: _usernameController, // <-- USAR CONTROLADOR
-                keyboardType: TextInputType.emailAddress,
+                controller: _usernameController,
+                keyboardType: TextInputType.text,
               ),
               const SizedBox(height: 20),
 
-              // --- 3. Campo de Contraseña ---
+              // Contraseña
               _buildInputField(
-                context, 
+                context,
                 label: 'Contraseña',
                 icon: Icons.lock,
                 cardColor: cardColor,
-                controller: _passwordController, // <-- USAR CONTROLADOR
+                controller: _passwordController,
                 obscureText: true,
               ),
               const SizedBox(height: 40),
 
-              // --- 4. Botón de Inicio de Sesión ---
+              // Botón Login
               _isLoading
-                  ? Center(child: CircularProgressIndicator(color: primaryColor))
+                  ? Center(
+                      child: CircularProgressIndicator(color: primaryColor),
+                    )
                   : ElevatedButton(
-                      onPressed: _handleLogin, // <-- LLAMAR A LA LÓGICA DE LOGIN
+                      onPressed: _handleLogin,
                       style: ElevatedButton.styleFrom(
                         backgroundColor: primaryColor,
                         padding: const EdgeInsets.symmetric(vertical: 18),
@@ -186,12 +205,12 @@ class _LoginViewState extends State<LoginView> {
                     ),
               const SizedBox(height: 20),
 
-              // --- 5. Opción de Registro ---
+              // Registro
               TextButton(
                 onPressed: () {
                   Navigator.push(
-                    context, 
-                    MaterialPageRoute(builder: (context) => const RegistrationView())
+                    context,
+                    MaterialPageRoute(builder: (_) => const RegistrationView()),
                   );
                 },
                 child: Text(
