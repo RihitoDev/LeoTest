@@ -5,6 +5,7 @@ import 'package:leotest/views/progress_view.dart';
 import 'package:leotest/views/login_view.dart';
 import 'package:leotest/services/auth_service.dart';
 import 'package:leotest/services/profile_service.dart';
+import 'package:leotest/views/stats_view.dart';
 
 class ProfileView extends StatefulWidget {
   final int? profileId;
@@ -26,13 +27,12 @@ class _ProfileViewState extends State<ProfileView> {
   void _loadProfileData() {
     if (mounted) {
       setState(() {
-        _futureProfileData = ProfileService.fetchProfileData();
+        _futureProfileData = ProfileService.fetchProfileData(widget.profileId!);
       });
     }
   }
 
   // --- WIDGETS AUXILIARES ---
-
   Widget _buildAvatarSection(
     BuildContext context,
     Color primaryColor,
@@ -109,6 +109,7 @@ class _ProfileViewState extends State<ProfileView> {
     Color primaryColor, {
     bool isLogout = false,
     VoidCallback? onTapAction,
+    UserProfileData? profile,
   }) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8.0),
@@ -151,7 +152,7 @@ class _ProfileViewState extends State<ProfileView> {
                   Navigator.pushAndRemoveUntil(
                     context,
                     MaterialPageRoute(builder: (context) => const LoginView()),
-                    (Route<dynamic> route) => false,
+                    (route) => false,
                   );
                 } else if (title == 'Editar Datos y Preferencias') {
                   Navigator.push(
@@ -162,8 +163,14 @@ class _ProfileViewState extends State<ProfileView> {
                   Navigator.push(
                     context,
                     MaterialPageRoute(
-                      builder: (context) => const ProgressView(),
+                      builder: (context) =>
+                          ProgressView(userId: widget.profileId!),
                     ),
+                  );
+                } else if (title == 'Estadísticas') {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (context) => const StatsView()),
                   );
                 }
               },
@@ -231,6 +238,7 @@ class _ProfileViewState extends State<ProfileView> {
                   Icons.timeline,
                   cardColor,
                   primaryColor,
+                  profile: profile,
                 ),
                 _buildProfileOption(
                   context,
