@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:leotest/main.dart';
+import 'package:leotest/views/admin_home_view.dart';
 import 'package:leotest/views/registration_view.dart';
 import 'package:leotest/services/auth_service.dart';
 import 'package:leotest/services/profile_service.dart';
@@ -29,6 +30,9 @@ class _LoginViewState extends State<LoginView> {
   // LÓGICA DE LOGIN
   // ================================================================
   Future<void> _handleLogin() async {
+    // Ocultar teclado
+    FocusScope.of(context).unfocus();
+
     if (_usernameController.text.isEmpty || _passwordController.text.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -41,23 +45,32 @@ class _LoginViewState extends State<LoginView> {
     setState(() => _isLoading = true);
 
     final result = await AuthService.login(
-      _usernameController.text,
-      _passwordController.text,
+      _usernameController.text.trim(),
+      _passwordController.text.trim(),
     );
 
     setState(() => _isLoading = false);
 
     if (result.success) {
-      // OBTENER USER ID REAL
       final String userIdStr = result.userId ?? AuthService.getCurrentUserId();
 
-      // Buscar si el usuario ya tiene perfil
+      // =====================================================
+      // ✅ SI ES ADMIN → IR DIRECTO A ADMINHOME
+      // =====================================================
+      if (result.role == "administrador") {
+        Navigator.of(context).pushAndRemoveUntil(
+          MaterialPageRoute(builder: (_) => const AdminHomeView()),
+          (Route<dynamic> route) => false,
+        );
+        return;
+      }
+
+      // =====================================================
+      // ✅ USUARIO NORMAL → VERIFICA SI TIENE PERFIL
+      // =====================================================
       final profile = await ProfileService.fetchProfileForUser(userIdStr);
 
       if (profile == null) {
-        // No tiene perfil -> Enviar al creador de perfil
-        final int userIdInt = int.tryParse(userIdStr) ?? 0;
-
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(builder: (_) => ProfileEditView()),
@@ -65,7 +78,6 @@ class _LoginViewState extends State<LoginView> {
         return;
       }
 
-      // Sí tiene perfil → Enviar al MainScreen
       final int? idPerfil = profile.idPerfil;
 
       Navigator.of(context).pushAndRemoveUntil(
@@ -76,12 +88,9 @@ class _LoginViewState extends State<LoginView> {
         (Route<dynamic> route) => false,
       );
     } else {
-      // Error de autenticación
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(
-            result.errorMessage ?? 'Error de autenticación desconocido.',
-          ),
+          content: Text(result.errorMessage ?? 'Error de autenticación.'),
           backgroundColor: Colors.red,
         ),
       );

@@ -111,7 +111,14 @@ class _MainScreenState extends State<MainScreen> {
   /// Manejo del BottomNavigationBar
   void _onItemTapped(int navbarIndex) {
     if (navbarIndex == 2) {
-      _showAddBookModal();
+      // Mostrar mensaje solo para administradores
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Solo para administradores por el momento'),
+          backgroundColor: Colors.orange,
+          duration: Duration(seconds: 2),
+        ),
+      );
       return;
     }
 

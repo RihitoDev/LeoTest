@@ -75,4 +75,33 @@ class StatsService {
       return GeneralStats(rachaDias: 0);
     }
   }
+
+  /// Actualiza las estadísticas del usuario en el backend
+  static Future<void> updateStats({
+    required int userId,
+    required int velocidadLectura,
+    required int porcentajeAciertos,
+  }) async {
+    try {
+      final response = await http.post(
+        Uri.parse('$_baseUrl/update'), // <-- quitar $userId de la URL
+        headers: {'Content-Type': 'application/json'},
+        body: json.encode({
+          'userId': userId, // <-- enviar userId en el body
+          'velocidadLectura': velocidadLectura,
+          'porcentajeAciertos': porcentajeAciertos,
+        }),
+      );
+
+      if (response.statusCode == 200) {
+        print("✅ Estadísticas actualizadas en backend");
+      } else {
+        print(
+          "❌ Error al actualizar estadísticas: ${response.statusCode} | ${response.body}",
+        );
+      }
+    } catch (e) {
+      print("❌ Error de conexión al actualizar estadísticas: $e");
+    }
+  }
 }

@@ -106,12 +106,13 @@ export const getGeneralStats = async (req, res) => {
         // 3) Tests completados reales
         // -------------------------------------------------
         const testsQuery = `
-            SELECT COUNT(*) AS test_completados
+            SELECT COALESCE(SUM(test_completados), 0) AS test_completados
             FROM evaluacion
             WHERE id_perfil = $1;
         `;
         const testsResult = await client.query(testsQuery, [perfilIdInt]);
         const testCompletados = parseInt(testsResult.rows[0].test_completados) || 0;
+
 
         // -------------------------------------------------
         // 4) Racha real desde lecturas_diarias
@@ -175,4 +176,52 @@ export const getGeneralStats = async (req, res) => {
     } finally {
         if (client) client.release();
     }
+};
+
+// =================================================================
+// 3. guardar datos
+// =================================================================
+
+export const updateStats = async (req, res) => {
+  let client;
+  try {
+    const { userId, velocidadLectura, porcentajeAciertos } = req.body;
+
+    // Validar userId
+    const userIdInt = validateAndParseInt(userId, 'userId');
+
+    client = await pool.connect();
+
+    // Verificar si ya existe
+    const existsResult = await client.query(
+      "SELECT 1 FROM estadistica WHERE id_usuario = $1",
+      [userIdInt]
+    );
+
+    if (existsResult.rows.length > 0) {
+      // Actualizar
+      await client.query(
+        `UPDATE estadistica
+         SET velocidad_lectura = $1,
+             porcentaje_aciertos = $2
+         WHERE id_usuario = $3`,
+        [velocidadLectura, porcentajeAciertos, userIdInt]
+      );
+    } else {
+      // Insertar
+      await client.query(
+        `INSERT INTO estadistica (id_usuario, velocidad_lectura, porcentaje_aciertos)
+         VALUES ($1, $2, $3)`,
+        [userIdInt, velocidadLectura, porcentajeAciertos]
+      );
+    }
+
+    res.status(200).json({ success: true, mensaje: "Estadísticas actualizadas correctamente" });
+
+  } catch (e) {
+    console.error("Error actualizando estadísticas:", e);
+    res.status(500).json({ success: false, mensaje: e.message });
+  } finally {
+    if (client) client.release();
+  }
 };

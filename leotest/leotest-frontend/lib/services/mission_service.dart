@@ -1,5 +1,3 @@
-// lib/services/mission_service.dart
-
 import 'dart:convert';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:http/http.dart' as http;
@@ -10,11 +8,10 @@ class MissionService {
   static String get _baseUrl => "${dotenv.env['API_BASE']}/api/missions";
   static String get _currentUserId => AuthService.getCurrentUserId();
 
-  /// Obtiene la lista de misiones activas para el usuario (HU-10.2).
-  static Future<List<Mission>> fetchActiveMissions() async {
-    final userId = _currentUserId;
+  /// Obtiene misiones activas del usuario
+  static Future<List<Mission>> fetchActiveMissions(int profileId) async {
     try {
-      final response = await http.get(Uri.parse('$_baseUrl/$userId'));
+      final response = await http.get(Uri.parse('$_baseUrl/$profileId'));
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
@@ -24,6 +21,7 @@ class MissionService {
               .toList();
         }
       }
+
       print('Error al obtener misiones: HTTP ${response.statusCode}');
       return [];
     } catch (e) {
@@ -32,7 +30,7 @@ class MissionService {
     }
   }
 
-  /// Marca una misión como completada (HU-10.4).
+  /// Completa una misión
   static Future<bool> completeMission(int idUsuarioMision) async {
     try {
       final response = await http.put(
@@ -43,6 +41,7 @@ class MissionService {
       if (response.statusCode == 200) {
         return true;
       }
+
       print('Error al completar misión: HTTP ${response.statusCode}');
       return false;
     } catch (e) {
