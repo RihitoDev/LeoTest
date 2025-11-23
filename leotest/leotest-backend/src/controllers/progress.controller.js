@@ -109,59 +109,76 @@ export const addBookToProgress = async (req, res) => {
 // =================================================================
 // 3. ACTUALIZAR EL PROGRESO DE UN LIBRO (PUT) - CORREGIDO
 // =================================================================
-export const updateProgress = async (req, res) => {
-    const { userId, id_libro } = req.params;
-    const { paginas_leidas, capitulos_completados, estado } = req.body;
+export const updateProgress = async (req, res) => { 
+  const { userId, id_libro } = req.params;
+  const { paginas_leidas, capitulos_completados, estado } = req.body;
 
-    try {
-        // Validar datos recibidos
-        if (paginas_leidas === undefined || capitulos_completados === undefined || !estado) {
-            return res.status(400).json({ mensaje: "Datos de progreso incompletos." });
-        }
+  try {
+      // Validar datos
+      if (paginas_leidas === undefined || capitulos_completados === undefined || !estado) {
+          return res.status(400).json({ mensaje: "Datos de progreso incompletos." });
+      }
 
-        const userIdInt = parseInt(userId);
-        const idLibroInt = parseInt(id_libro);
-        const paginasLeidasInt = parseInt(paginas_leidas);
-        const capitulosCompletadosInt = parseInt(capitulos_completados);
+      const userIdInt = parseInt(userId);
+      const idLibroInt = parseInt(id_libro);
+      const paginasLeidasInt = parseInt(paginas_leidas);
+      const capitulosCompletadosInt = parseInt(capitulos_completados);
 
-        if (isNaN(userIdInt) || isNaN(idLibroInt) || isNaN(paginasLeidasInt) || isNaN(capitulosCompletadosInt)) {
-            return res.status(400).json({ mensaje: "Los campos deben ser números enteros." });
-        }
+      if (isNaN(userIdInt) || isNaN(idLibroInt) || isNaN(paginasLeidasInt) || isNaN(capitulosCompletadosInt)) {
+          return res.status(400).json({ mensaje: "Los campos deben ser números enteros." });
+      }
 
-        const estadoCompletado = 'Completado';
+      const estadoCompletado = 'Completado';
 
-        const updateQuery = `
-            UPDATE progreso
-            SET
-                paginas_leidas = $3,
-                capitulos_completados = $4,
-                estado = $5,
-                fecha_fin = CASE WHEN $5::varchar = $6::varchar THEN NOW() ELSE '9999-12-31' END
-            WHERE id_perfil = $1 AND id_libro = $2
-            RETURNING *;
-        `;
+      // Actualizar progreso
+      const updateQuery = `
+          UPDATE progreso
+          SET
+              paginas_leidas = $3,
+              capitulos_completados = $4,
+              estado = $5,
+              fecha_fin = CASE WHEN $5::varchar = $6::varchar THEN NOW() ELSE '9999-12-31' END
+          WHERE id_perfil = $1 AND id_libro = $2
+          RETURNING *;
+      `;
 
-        const result = await pool.query(updateQuery, [
-            userIdInt,
-            idLibroInt,
-            paginasLeidasInt,
-            capitulosCompletadosInt,
-            estado,
-            estadoCompletado
-        ]);
+      const result = await pool.query(updateQuery, [
+          userIdInt,
+          idLibroInt,
+          paginasLeidasInt,
+          capitulosCompletadosInt,
+          estado,
+          estadoCompletado
+      ]);
 
-        if (result.rows.length === 0) {
-            return res.status(404).json({ mensaje: "Progreso no encontrado para actualizar." });
-        }
+      if (result.rows.length === 0) {
+          return res.status(404).json({ mensaje: "Progreso no encontrado para actualizar." });
+      }
 
-        res.status(200).json({ exito: true, mensaje: "Progreso actualizado.", progreso: result.rows[0] });
+      // 🔥 Registrar lectura diaria aquí ADENTRO
+      const insertLectura = `
+        INSERT INTO lecturas_diarias (id_perfil, fecha_lectura)
+        SELECT $1, NOW()::date
+        WHERE NOT EXISTS (
+            SELECT 1 FROM lecturas_diarias
+            WHERE id_perfil = $1 AND fecha_lectura = NOW()::date
+        );
+      `;
 
-    } catch (error) {
-        console.error("Error al actualizar progreso:", error);
-        res.status(500).json({ mensaje: "Error interno del servidor al actualizar progreso." });
-    }
+      await pool.query(insertLectura, [userIdInt]);
+
+      // Respuesta final
+      return res.status(200).json({
+          exito: true,
+          mensaje: "Progreso actualizado.",
+          progreso: result.rows[0]
+      });
+
+  } catch (error) {
+      console.error("Error al actualizar progreso:", error);
+      return res.status(500).json({ mensaje: "Error interno del servidor al actualizar progreso." });
+  }
 };
-
 
 // =================================================================
 // 4. ELIMINAR UN LIBRO (DELETE)
@@ -197,4 +214,52 @@ export const deleteProgress = async (req, res) => {
         console.error("Error al eliminar libro de progreso:", error.message || error);
         res.status(500).json({ mensaje: "Error interno del servidor al eliminar libro." });
     }
+};
+
+
+export const getReadingStreak = async (req, res) => {
+  const { idPerfil } = req.params;
+
+  try {
+    const query = `
+      SELECT fecha_lectura::date
+      FROM lecturas_diarias
+      WHERE id_perfil = $1
+      ORDER BY fecha_lectura DESC;
+    `;
+
+    const result = await pool.query(query, [idPerfil]);
+    const fechas = result.rows.map(r => r.fecha_lectura);
+
+    let streak = 0;
+    let hoy = new Date().toISOString().slice(0, 10);
+
+    for (let i = 0; i < fechas.length; i++) {
+      const fecha = fechas[i].toISOString().slice(0, 10);
+
+      if (i === 0) {
+        // ¿Leyó hoy?
+        if (fecha === hoy) streak++;
+        else {
+          // si no leyó hoy, se corta la racha
+          break;
+        }
+      } else {
+        // comparar con el día anterior en la secuencia
+        const anterior = new Date(fechas[i - 1]);
+        anterior.setDate(anterior.getDate() - 1);
+
+        const esperado = anterior.toISOString().slice(0, 10);
+
+        if (fecha === esperado) streak++;
+        else break;
+      }
+    }
+
+    return res.json({ racha: streak });
+
+  } catch (e) {
+    console.error("Error obteniendo racha:", e);
+    return res.status(500).json({ error: "Error interno" });
+  }
 };

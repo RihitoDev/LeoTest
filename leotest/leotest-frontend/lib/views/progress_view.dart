@@ -1,4 +1,7 @@
+// lib/views/progress_view.dart
+
 import 'package:flutter/material.dart';
+import 'package:fl_chart/fl_chart.dart'; // Import necesario para los gráficos
 import '../services/progress_service.dart';
 
 class ProgressView extends StatefulWidget {
@@ -11,6 +14,7 @@ class ProgressView extends StatefulWidget {
 
 class _ProgressViewState extends State<ProgressView> {
   late Future<List<BookProgress>> _futureProgress;
+  int rachaDias = 0; // 🔥 ahora se carga desde la API
 
   @override
   void initState() {
@@ -19,14 +23,19 @@ class _ProgressViewState extends State<ProgressView> {
     print("🚀 [ProgressView] INIT - USER ID: ${widget.userId}");
 
     _futureProgress = ProgressService.getUserProgress(widget.userId);
+
+    // 🔥 Obtener racha REAL desde API
+    ProgressService.getReadingStreak(widget.userId).then((r) {
+      setState(() {
+        rachaDias = r;
+      });
+    });
   }
 
   @override
   Widget build(BuildContext context) {
     final primaryColor = Theme.of(context).colorScheme.primary;
     final cardColor = Theme.of(context).colorScheme.surface;
-
-    print("🔄 [ProgressView] BUILD ejecutado");
 
     return Scaffold(
       appBar: AppBar(
@@ -39,43 +48,24 @@ class _ProgressViewState extends State<ProgressView> {
       body: FutureBuilder<List<BookProgress>>(
         future: _futureProgress,
         builder: (context, snapshot) {
-          print(
-            "📌 [FutureBuilder] connectionState = ${snapshot.connectionState}",
-          );
-          print("📌 [FutureBuilder] hasData = ${snapshot.hasData}");
-          print("📌 [FutureBuilder] hasError = ${snapshot.hasError}");
-          print("📌 [FutureBuilder] DATA = ${snapshot.data}");
-          print("📌 [FutureBuilder] ERROR = ${snapshot.error}");
-
           if (snapshot.connectionState == ConnectionState.waiting) {
-            print("⏳ Esperando datos...");
             return const Center(child: CircularProgressIndicator());
           }
 
           if (snapshot.hasError) {
-            print("❌ ERROR: ${snapshot.error}");
             return Center(child: Text("Error: ${snapshot.error}"));
           }
 
-          if (!snapshot.hasData) {
-            print("⚠️ NO HAY DATOS (snapshot.hasData = false)");
-            return const Center(child: Text("No hay libros en progreso."));
-          }
-
-          if (snapshot.data!.isEmpty) {
-            print("⚠️ LISTA VACÍA (snapshot.data!.isEmpty = true)");
+          if (!snapshot.hasData || snapshot.data!.isEmpty) {
             return const Center(child: Text("No hay libros en progreso."));
           }
 
           final progressList = snapshot.data!;
-          print("🎉 Se recibieron ${progressList.length} elementos");
-
           final totalLibros = progressList.length;
           final totalPaginasLeidas = progressList.fold<int>(
             0,
             (sum, b) => sum + b.paginasLeidas,
           );
-          final rachaDias = 5;
 
           return SingleChildScrollView(
             padding: const EdgeInsets.all(16),
@@ -102,7 +92,8 @@ class _ProgressViewState extends State<ProgressView> {
                 _buildStreakCard(primaryColor, cardColor, rachaDias),
                 const SizedBox(height: 30),
                 _buildSectionTitle('Libros Completados por Mes', context),
-                _buildSimulatedChart(cardColor),
+                _buildBooksPerMonthChart(cardColor, progressList),
+                const SizedBox(height: 30),
               ],
             ),
           );
@@ -117,10 +108,6 @@ class _ProgressViewState extends State<ProgressView> {
     int totalLibros,
     int totalPaginasLeidas,
   ) {
-    print(
-      "📊 Construyendo métricas: libros=$totalLibros páginas=$totalPaginasLeidas",
-    );
-
     return Row(
       children: [
         _buildMetricCard(
@@ -149,8 +136,6 @@ class _ProgressViewState extends State<ProgressView> {
     IconData icon,
     Color iconColor,
   ) {
-    print("📌 Construyendo card: $title = $value");
-
     return Expanded(
       child: Card(
         color: cardColor,
@@ -188,8 +173,6 @@ class _ProgressViewState extends State<ProgressView> {
   }
 
   Widget _buildSectionTitle(String title, BuildContext context) {
-    print("📌 Construyendo sección: $title");
-
     return Padding(
       padding: const EdgeInsets.only(bottom: 10.0),
       child: Text(
@@ -203,8 +186,6 @@ class _ProgressViewState extends State<ProgressView> {
   }
 
   Widget _buildStreakCard(Color primaryColor, Color cardColor, int rachaDias) {
-    print("🔥 Construyendo racha: $rachaDias");
-
     return Card(
       color: cardColor,
       elevation: 4,
@@ -235,27 +216,107 @@ class _ProgressViewState extends State<ProgressView> {
     );
   }
 
-  Widget _buildSimulatedChart(Color cardColor) {
-    print("📈 Construyendo gráfico simulado");
+  Widget _buildBooksPerMonthChart(
+    Color cardColor,
+    List<BookProgress> progressList,
+  ) {
+    // Contar libros completados por mes
+    Map<String, int> data = {
+      "Ene": 0,
+      "Feb": 0,
+      "Mar": 0,
+      "Abr": 0,
+      "May": 0,
+      "Jun": 0,
+      "Jul": 0,
+      "Ago": 0,
+      "Sep": 0,
+      "Oct": 0,
+      "Nov": 0,
+      "Dic": 0,
+    };
 
-    return Container(
-      height: 200,
-      width: double.infinity,
-      decoration: BoxDecoration(
-        color: cardColor,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.3),
-            blurRadius: 5,
-            offset: const Offset(0, 3),
+    for (var b in progressList) {
+      if (b.estado == "Completado" && b.fechaFin != null) {
+        DateTime fin = DateTime.parse(b.fechaFin!);
+        String mes = [
+          "Ene",
+          "Feb",
+          "Mar",
+          "Abr",
+          "May",
+          "Jun",
+          "Jul",
+          "Ago",
+          "Sep",
+          "Oct",
+          "Nov",
+          "Dic",
+        ][fin.month - 1];
+        data[mes] = (data[mes] ?? 0) + 1;
+      }
+    }
+
+    final months = data.keys.toList();
+    final values = data.values.toList();
+
+    return Card(
+      color: cardColor,
+      elevation: 4,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: SizedBox(
+          height: 200,
+          child: LineChart(
+            LineChartData(
+              gridData: FlGridData(show: true, horizontalInterval: 1),
+              titlesData: FlTitlesData(
+                leftTitles: AxisTitles(
+                  sideTitles: SideTitles(showTitles: true, interval: 1),
+                ),
+                bottomTitles: AxisTitles(
+                  sideTitles: SideTitles(
+                    showTitles: true,
+                    getTitlesWidget: (value, meta) {
+                      if (value.toInt() < 0 || value.toInt() >= months.length) {
+                        return const SizedBox();
+                      }
+                      return Text(
+                        months[value.toInt()],
+                        style: const TextStyle(
+                          color: Colors.white70,
+                          fontSize: 12,
+                        ),
+                      );
+                    },
+                    interval: 1,
+                  ),
+                ),
+                topTitles: AxisTitles(
+                  sideTitles: SideTitles(showTitles: false),
+                ),
+                rightTitles: AxisTitles(
+                  sideTitles: SideTitles(showTitles: false),
+                ),
+              ),
+              borderData: FlBorderData(show: false),
+              minY: 0,
+              lineBarsData: [
+                LineChartBarData(
+                  spots: List.generate(
+                    values.length,
+                    (i) => FlSpot(i.toDouble(), values[i].toDouble()),
+                  ),
+                  isCurved: true,
+                  barWidth: 3,
+                  color: Colors.blueAccent,
+                  dotData: FlDotData(show: true),
+                ),
+              ],
+            ),
           ),
-        ],
-      ),
-      alignment: Alignment.center,
-      child: const Text(
-        'Gráfico de Progreso Simulado',
-        style: TextStyle(color: Colors.white54, fontSize: 16),
+        ),
       ),
     );
   }

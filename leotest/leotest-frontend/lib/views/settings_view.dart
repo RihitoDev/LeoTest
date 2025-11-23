@@ -1,113 +1,126 @@
+// lib/views/settings_view.dart
 import 'package:flutter/material.dart';
+import 'package:leotest/views/profile_edit_view.dart';
+import 'package:leotest/views/user_edit_view.dart';
+import 'package:leotest/services/auth_service.dart';
+import 'package:leotest/views/login_view.dart';
 
 class SettingsView extends StatelessWidget {
-  const SettingsView({super.key});
+  final int? profileId;
+  const SettingsView({super.key, this.profileId});
 
   @override
   Widget build(BuildContext context) {
-    final primaryColor = Theme.of(context).colorScheme.primary;
+    final primary = Theme.of(context).colorScheme.primary;
     final cardColor = Theme.of(context).colorScheme.surface;
 
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Editar Datos y Preferencias'),
-        backgroundColor: cardColor, // Un color oscuro para la AppBar
-        elevation: 1,
-      ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Sección de Datos Personales
-            _buildSectionTitle(context, 'Datos Personales'),
-            _buildEditField('Nombre de Usuario', 'Alejandro', Icons.person, cardColor),
-            _buildEditField('Email', 'alejandro.u@example.com', Icons.email, cardColor),
-            _buildEditField('Contraseña', '********', Icons.lock, cardColor, obscureText: true),
-            
-            const SizedBox(height: 30),
-
-            // Sección de Preferencias de Lectura
-            _buildSectionTitle(context, 'Preferencias de Lectura'),
-            _buildPreferenceToggle('Racha de Lectura Activa', true, cardColor),
-            _buildPreferenceToggle('Recibir Notificaciones', false, cardColor),
-
-            const SizedBox(height: 30),
-            
-            Center(
-              child: ElevatedButton(
-                onPressed: () {
-                  // Lógica para guardar los cambios en la base de datos
-                  Navigator.pop(context); // Vuelve a la vista de perfil
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('¡Datos guardados con éxito!', style: TextStyle(color: primaryColor)))
-                  );
-                },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: primaryColor,
-                  padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 15),
-                ),
-                child: const Text('Guardar Cambios', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
+    void _confirmDelete(BuildContext ctx, int userId) async {
+      final confirm = await showDialog<bool>(
+        context: ctx,
+        builder: (_) => AlertDialog(
+          title: const Text("Eliminar cuenta"),
+          content: const Text(
+            "¿Estás seguro? Esta acción no se puede deshacer.",
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text("Cancelar"),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: const Text(
+                "Eliminar",
+                style: TextStyle(color: Colors.red),
               ),
             ),
           ],
         ),
-      ),
-    );
-  }
+      );
 
-  Widget _buildSectionTitle(BuildContext context, String title) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 10.0, top: 10.0),
-      child: Text(
-        title,
-        style: Theme.of(context).textTheme.titleLarge?.copyWith(
-          color: Colors.white, 
-          fontWeight: FontWeight.bold
-        ),
-      ),
-    );
-  }
+      if (confirm == true) {
+        final ok = await AuthService.deleteUser(userId);
+        if (ok) {
+          Navigator.pushAndRemoveUntil(
+            ctx,
+            MaterialPageRoute(builder: (_) => const LoginView()),
+            (_) => false,
+          );
+        } else {
+          ScaffoldMessenger.of(ctx).showSnackBar(
+            const SnackBar(content: Text("No se pudo eliminar la cuenta")),
+          );
+        }
+      }
+    }
 
-  Widget _buildEditField(String label, String initialValue, IconData icon, Color cardColor, {bool obscureText = false}) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8.0),
-      child: TextFormField(
-        initialValue: initialValue,
-        obscureText: obscureText,
-        style: const TextStyle(color: Colors.white70),
-        decoration: InputDecoration(
-          labelText: label,
-          labelStyle: const TextStyle(color: Colors.grey),
-          prefixIcon: Icon(icon, color: Colors.grey),
-          fillColor: cardColor,
-          filled: true,
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(10),
-            borderSide: BorderSide.none,
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildPreferenceToggle(String label, bool value, Color cardColor) {
-    // Nota: Para que este Toggle cambie de estado, necesitaría ser un StatefulWidget.
-    // Por ahora, solo simula la apariencia en un StatelessWidget.
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4.0),
-      child: Container(
-        decoration: BoxDecoration(
-          color: cardColor,
-          borderRadius: BorderRadius.circular(10),
-        ),
-        child: SwitchListTile(
-          title: Text(label, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
-          value: value,
-          onChanged: (newValue) {
-            // Lógica para cambiar el estado de la preferencia
-          },
-          activeColor: Colors.green, // Puedes usar tu primaryColor o verde para 'on'
+    return Scaffold(
+      appBar: AppBar(title: const Text("Editar Datos y Preferencias")),
+      body: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          children: [
+            Card(
+              color: cardColor,
+              child: ListTile(
+                leading: Icon(Icons.person, color: primary),
+                title: const Text("Editar Perfil"),
+                subtitle: const Text("Nombre, edad, avatar, nivel educativo"),
+                trailing: const Icon(Icons.arrow_forward_ios, size: 16),
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => ProfileEditView(profileId: profileId),
+                    ),
+                  );
+                },
+              ),
+            ),
+            const SizedBox(height: 10),
+            Card(
+              color: cardColor,
+              child: ListTile(
+                leading: Icon(Icons.account_circle, color: primary),
+                title: const Text("Editar Usuario"),
+                subtitle: const Text("Nombre de usuario y contraseña"),
+                trailing: const Icon(Icons.arrow_forward_ios, size: 16),
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => UserEditView(profileId: profileId),
+                    ),
+                  );
+                },
+              ),
+            ),
+            const SizedBox(height: 10),
+            Card(
+              color: cardColor,
+              child: ListTile(
+                leading: Icon(Icons.delete_forever, color: Colors.redAccent),
+                title: const Text(
+                  "Eliminar Cuenta",
+                  style: TextStyle(color: Colors.redAccent),
+                ),
+                subtitle: const Text("Eliminar cuenta y datos"),
+                onTap: () async {
+                  // necesitas el userId para eliminar -> pedirlo desde AuthService
+                  try {
+                    final userId = int.parse(AuthService.getCurrentUserId());
+                    _confirmDelete(context, userId);
+                  } catch (e) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text("No se pudo obtener el usuario actual."),
+                      ),
+                    );
+                  }
+                },
+              ),
+            ),
+          ],
         ),
       ),
     );

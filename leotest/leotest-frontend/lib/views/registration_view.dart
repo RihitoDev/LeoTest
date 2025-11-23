@@ -1,5 +1,9 @@
+// lib/views/registration_view.dart
 import 'package:flutter/material.dart';
-import 'package:leotest/services/auth_service.dart'; // Importar AuthService
+import 'package:leotest/services/auth_service.dart';
+import 'package:leotest/services/profile_service.dart';
+import 'package:leotest/main.dart';
+import 'package:leotest/views/login_view.dart';
 
 class RegistrationView extends StatefulWidget {
   const RegistrationView({super.key});
@@ -9,201 +13,250 @@ class RegistrationView extends StatefulWidget {
 }
 
 class _RegistrationViewState extends State<RegistrationView> {
-  // Controladores
-  final TextEditingController _fullNameController = TextEditingController();
-  final TextEditingController _emailController = TextEditingController();
+  // Controllers
   final TextEditingController _usernameController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
-  
-  // Estado
+  final TextEditingController _nombrePerfilController = TextEditingController();
+  final TextEditingController _edadController = TextEditingController();
+
   bool _isLoading = false;
+  List<NivelEducativo> _niveles = [];
+  int? _selectedNivelId;
+
+  String? _selectedImage;
+
+  final List<String> _avatarImages = [
+    "https://htnzhsbddlsxewwpbjpx.supabase.co/storage/v1/object/public/leoTest/imagenes_perfil/avatar1.jpg",
+    "https://htnzhsbddlsxewwpbjpx.supabase.co/storage/v1/object/public/leoTest/imagenes_perfil/avatar2.jpeg",
+    "https://htnzhsbddlsxewwpbjpx.supabase.co/storage/v1/object/public/leoTest/imagenes_perfil/avatar3.jpeg",
+    "https://htnzhsbddlsxewwpbjpx.supabase.co/storage/v1/object/public/leoTest/imagenes_perfil/avatar4.jpg",
+    "https://htnzhsbddlsxewwpbjpx.supabase.co/storage/v1/object/public/leoTest/imagenes_perfil/avatar5.jpg",
+    "https://htnzhsbddlsxewwpbjpx.supabase.co/storage/v1/object/public/leoTest/imagenes_perfil/avatar6.jpg",
+  ];
 
   @override
-  void dispose() {
-    _fullNameController.dispose();
-    _emailController.dispose();
-    _usernameController.dispose();
-    _passwordController.dispose();
-    super.dispose();
+  void initState() {
+    super.initState();
+    _loadNiveles();
+  }
+
+  void _loadNiveles() async {
+    final niveles = await ProfileService.fetchNivelesEducativos();
+    setState(() {
+      _niveles = niveles;
+      if (niveles.isNotEmpty) _selectedNivelId = niveles.first.id;
+    });
   }
 
   Future<void> _handleRegister() async {
-    // Validación mínima (puedes añadir más regex o validación de Form)
-    if (_fullNameController.text.isEmpty ||
-        _emailController.text.isEmpty ||
-        _usernameController.text.isEmpty ||
-        _passwordController.text.isEmpty) {
+    if (_usernameController.text.isEmpty ||
+        _passwordController.text.isEmpty ||
+        _nombrePerfilController.text.isEmpty ||
+        _edadController.text.isEmpty ||
+        _selectedImage == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Por favor, completa todos los campos.')),
+        const SnackBar(content: Text("Completa todos los campos.")),
       );
       return;
     }
-    
-    // Simulación de usar el nombre completo como nombre de usuario (si aplica)
-    final username = _usernameController.text.trim();
-    
+
     setState(() => _isLoading = true);
-    
+
+    // 1️⃣ Crear usuario
     final result = await AuthService.register(
-      fullName: _fullNameController.text.trim(),
-      username: username,
-      password: _passwordController.text,
-      email: _emailController.text.trim(),
+      fullName: "", // Ya no se usa
+      username: _usernameController.text.trim(),
+      password: _passwordController.text.trim(),
+    );
+
+    if (!result.success) {
+      setState(() => _isLoading = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(result.errorMessage ?? "Error al registrar usuario."),
+        ),
+      );
+      return;
+    }
+
+    final String userIdStr = result.userId!;
+    final int userId = int.parse(userIdStr);
+
+    // 2️⃣ Crear perfil
+    final perfilId = await ProfileService.createProfile(
+      idUsuario: userId,
+      nombrePerfil: _nombrePerfilController.text.trim(),
+      edad: int.parse(_edadController.text.trim()),
+      idNivelEducativo: _selectedNivelId,
+      imagenPerfilUrl: _selectedImage,
     );
 
     setState(() => _isLoading = false);
 
-    if (result.success) {
-      // Registro exitoso: Vuelve al Login
-      Navigator.pop(context);
+    if (perfilId != null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(result.errorMessage ?? 'Registro exitoso. ¡Inicia sesión!'),
-          backgroundColor: Colors.green[700],
-        )
+        const SnackBar(content: Text("Registro exitoso. Ahora inicia sesión.")),
+      );
+
+      Navigator.pushAndRemoveUntil(
+        context,
+        MaterialPageRoute(builder: (_) => const LoginView()),
+        (route) => false,
       );
     } else {
-      // Muestra el mensaje de error del backend (ej. "Usuario ya está en uso")
-       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(result.errorMessage ?? 'Error desconocido al registrar.'),
-          backgroundColor: Colors.red,
-        ),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text("Error al crear perfil.")));
     }
   }
-  
 
-  @override
-  Widget build(BuildContext context) {
-    final primaryColor = Theme.of(context).colorScheme.primary;
-    final cardColor = Theme.of(context).colorScheme.surface;
-
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Crear Cuenta'),
-        backgroundColor: Colors.transparent, 
-        elevation: 0,
-      ),
-      body: Center(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(30.0),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              // --- 1. Logo o Título de la Aplicación ---
-              Icon(
-                Icons.person_add_alt_1,
-                size: 80,
-                color: primaryColor, 
-              ),
-              const SizedBox(height: 10),
-              const Text(
-                'Únete a LeoTest',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 28,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.white,
-                ),
-              ),
-              const SizedBox(height: 40),
-
-              // --- 2. Campo de Nombre Completo ---
-              _buildInputField(
-                context, 
-                label: 'Nombre Completo',
-                icon: Icons.person_outline,
-                cardColor: cardColor,
-                controller: _fullNameController,
-              ),
-              const SizedBox(height: 20),
-
-              // --- 3. Campo de Correo Electrónico ---
-               _buildInputField(
-                context, 
-                label: 'Correo Electrónico',
-                icon: Icons.email_outlined,
-                cardColor: cardColor,
-                controller: _emailController,
-                keyboardType: TextInputType.emailAddress,
-              ),
-              const SizedBox(height: 20),
-              
-              // --- 4. Campo de Usuario ---
-              _buildInputField(
-                context, 
-                label: 'Usuario (Nombre Corto)',
-                icon: Icons.person,
-                cardColor: cardColor,
-                controller: _usernameController,
-              ),
-              const SizedBox(height: 20),
-
-
-              // --- 5. Campo de Contraseña ---
-              _buildInputField(
-                context, 
-                label: 'Contraseña',
-                icon: Icons.lock_outline,
-                cardColor: cardColor,
-                controller: _passwordController,
-                obscureText: true,
-              ),
-              const SizedBox(height: 40),
-
-              // --- 6. Botón de Registro ---
-              _isLoading
-                  ? Center(child: CircularProgressIndicator(color: primaryColor))
-                  : ElevatedButton(
-                      onPressed: _handleRegister, // Llamar a la nueva lógica
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: primaryColor, 
-                        padding: const EdgeInsets.symmetric(vertical: 18),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                      ),
-                      child: const Text(
-                        'REGISTRARSE',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.black, 
-                        ),
-                      ),
-                    ),
-            ],
-          ),
+  Widget _buildInputField({
+    required String label,
+    required IconData icon,
+    required TextEditingController controller,
+    bool obscure = false,
+  }) {
+    return TextFormField(
+      controller: controller,
+      obscureText: obscure,
+      style: const TextStyle(color: Colors.white),
+      decoration: InputDecoration(
+        labelText: label,
+        labelStyle: const TextStyle(color: Colors.grey),
+        prefixIcon: Icon(icon, color: Colors.grey),
+        filled: true,
+        fillColor: Colors.black26,
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(10),
+          borderSide: BorderSide.none,
         ),
       ),
     );
   }
 
-  Widget _buildInputField(
-    BuildContext context, 
-    {required String label, required IconData icon, required Color cardColor, required TextEditingController controller, bool obscureText = false, TextInputType keyboardType = TextInputType.text}
-  ) {
-    return TextFormField(
-      controller: controller, // Usar el controlador
-      style: const TextStyle(color: Colors.white),
-      obscureText: obscureText,
-      keyboardType: keyboardType,
-      cursorColor: Theme.of(context).colorScheme.primary, 
-      decoration: InputDecoration(
-        labelText: label,
-        labelStyle: const TextStyle(color: Colors.grey),
-        prefixIcon: Icon(icon, color: Colors.grey),
-        fillColor: cardColor,
-        filled: true,
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(10),
-          borderSide: BorderSide.none,
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(10),
-          borderSide: BorderSide(color: Theme.of(context).colorScheme.primary, width: 2.0),
+  @override
+  Widget build(BuildContext context) {
+    final primaryColor = Theme.of(context).colorScheme.primary;
+
+    return Scaffold(
+      appBar: AppBar(title: const Text("Crear Cuenta")),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(25),
+        child: Column(
+          children: [
+            Icon(Icons.person_add_alt_1, size: 80, color: primaryColor),
+            const SizedBox(height: 20),
+
+            _buildInputField(
+              label: "Nombre de Usuario",
+              icon: Icons.person,
+              controller: _usernameController,
+            ),
+            const SizedBox(height: 20),
+
+            _buildInputField(
+              label: "Contraseña",
+              icon: Icons.lock,
+              controller: _passwordController,
+              obscure: true,
+            ),
+            const SizedBox(height: 20),
+
+            _buildInputField(
+              label: "Nombre del Perfil",
+              icon: Icons.badge,
+              controller: _nombrePerfilController,
+            ),
+            const SizedBox(height: 20),
+
+            _buildInputField(
+              label: "Edad",
+              icon: Icons.cake,
+              controller: _edadController,
+            ),
+            const SizedBox(height: 20),
+
+            // Avatar Grid
+            const Text(
+              "Selecciona un Avatar",
+              style: TextStyle(color: Colors.white70),
+            ),
+            const SizedBox(height: 10),
+            Wrap(
+              spacing: 10,
+              children: _avatarImages.map((img) {
+                final selected = (img == _selectedImage);
+                return GestureDetector(
+                  onTap: () => setState(() => _selectedImage = img),
+                  child: Container(
+                    padding: selected ? EdgeInsets.all(4) : EdgeInsets.zero,
+                    decoration: BoxDecoration(
+                      border: selected
+                          ? Border.all(color: primaryColor, width: 3)
+                          : null,
+                      shape: BoxShape.circle,
+                    ),
+                    child: CircleAvatar(
+                      backgroundImage: NetworkImage(img),
+                      radius: 30,
+                    ),
+                  ),
+                );
+              }).toList(),
+            ),
+            const SizedBox(height: 20),
+
+            // Selector Nivel Educativo
+            DropdownButtonFormField<int>(
+              value: _selectedNivelId,
+              dropdownColor: Colors.black87,
+              decoration: InputDecoration(
+                filled: true,
+                fillColor: Colors.black26,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
+              ),
+              items: _niveles.map((n) {
+                return DropdownMenuItem(
+                  value: n.id,
+                  child: Text(
+                    n.nombre,
+                    style: const TextStyle(color: Colors.white),
+                  ),
+                );
+              }).toList(),
+              onChanged: (v) => setState(() => _selectedNivelId = v),
+            ),
+            const SizedBox(height: 40),
+
+            _isLoading
+                ? CircularProgressIndicator(color: primaryColor)
+                : SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      onPressed: _handleRegister,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: primaryColor,
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                        elevation: 4,
+                        shadowColor: primaryColor.withOpacity(0.4),
+                      ),
+                      child: const Text(
+                        "Crear Cuenta",
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.black,
+                          letterSpacing: 1.2,
+                        ),
+                      ),
+                    ),
+                  ),
+          ],
         ),
       ),
     );

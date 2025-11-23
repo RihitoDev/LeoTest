@@ -10,14 +10,18 @@ class GeneralStats {
   final int rachaDias;
   final double? velocidadLectura;
   final int? librosLeidos;
+  final int? totalLibros;
   final int? totalTestCompletados;
+  final int? totalTests;
   final double? porcentajeAciertos;
 
   GeneralStats({
     required this.rachaDias,
     this.velocidadLectura,
     this.librosLeidos,
+    this.totalLibros,
     this.totalTestCompletados,
+    this.totalTests,
     this.porcentajeAciertos,
   });
 }
@@ -52,14 +56,16 @@ class StatsService {
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
-        final stats = data['estadisticas'] as Map<String, dynamic>;
-
         return GeneralStats(
-          rachaDias: stats['racha_dias'] as int? ?? 0,
-          librosLeidos: stats['libros_leidos'] as int? ?? 0,
-          totalTestCompletados: stats['total_test_completados'] as int? ?? 0,
-          velocidadLectura: (stats['velocidad_lectura'] as num?)?.toDouble(),
-          porcentajeAciertos: (stats['porcentaje_aciertos'] as num?)?.toDouble(),
+          rachaDias: data['racha_dias'] as int? ?? 0,
+          librosLeidos: data['libros_leidos'] as int? ?? 0,
+          totalLibros: data['total_libros'] as int? ?? 0,
+          totalTestCompletados: data['total_test_completados'] as int? ?? 0,
+          totalTests: data['total_tests'] as int? ?? 0,
+          velocidadLectura:
+              double.tryParse(data['velocidad_lectura'].toString()) ?? 0,
+          porcentajeAciertos:
+              double.tryParse(data['porcentaje_aciertos'].toString()) ?? 0,
         );
       }
       print('Error al obtener stats generales: ${response.statusCode}');
